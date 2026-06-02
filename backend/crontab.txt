@@ -1,0 +1,9 @@
+# SMS 接码平台定时任务配置
+# 导入方法：crontab /Volumes/ssd/aicode_new0421/sms/sms_Flutter/backend/crontab.txt
+# 或手动添加到 crontab -e
+
+# 短信轮询 - 每分钟执行一次，从 HeroSMS API 拉取新短信
+*/1 * * * * php /Volumes/ssd/aicode_new0421/sms/sms_Flutter/backend/cron/fetch-sms.php
+
+# 订单过期检查 - 每5分钟执行一次，标记超时未使用订单
+*/5 * * * * php /Volumes/ssd/aicode_new0421/sms/sms_Flutter/backend/cron_expire_orders.php

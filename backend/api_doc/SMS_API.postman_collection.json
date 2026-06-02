@@ -1,0 +1,456 @@
+{
+  "info": {
+    "name": "SMS接码平台 API",
+    "description": "SMS接码平台完整API集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://smsapi2.niceapp.eu.cc/api",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "认证相关",
+      "item": [
+        {
+          "name": "设备注册/登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"test_device_{{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "使用设备ID注册或登录，返回用户信息和Token"
+          },
+          "response": []
+        },
+        {
+          "name": "邮箱注册",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test{{$timestamp}}@example.com\",\n  \"password\": \"password123\",\n  \"device_id\": \"device_{{$timestamp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/manual-register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "manual-register"]
+            },
+            "description": "使用邮箱和密码注册新账号"
+          },
+          "response": []
+        },
+        {
+          "name": "密码登录",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/password-login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "password-login"]
+            },
+            "description": "使用邮箱和密码登录"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "服务相关",
+      "item": [
+        {
+          "name": "获取已发布的服务国家",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/service-countries/published",
+              "host": ["{{base_url}}"],
+              "path": ["service-countries", "published"]
+            },
+            "description": "获取所有已发布的服务-国家组合"
+          },
+          "response": []
+        },
+        {
+          "name": "获取服务列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/services",
+              "host": ["{{base_url}}"],
+              "path": ["services"]
+            },
+            "description": "获取所有可用服务"
+          },
+          "response": []
+        },
+        {
+          "name": "获取国家列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/countries?service_id=1",
+              "host": ["{{base_url}}"],
+              "path": ["countries"],
+              "query": [
+                {
+                  "key": "service_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "获取指定服务的可用国家"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "订单相关",
+      "item": [
+        {
+          "name": "创建订单",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": 1,\n  \"country_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders",
+              "host": ["{{base_url}}"],
+              "path": ["orders"]
+            },
+            "description": "创建新的接码订单"
+          },
+          "response": []
+        },
+        {
+          "name": "激活订单",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/activate",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "activate"]
+            },
+            "description": "激活pending状态的订单"
+          },
+          "response": []
+        },
+        {
+          "name": "获取订单详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}"]
+            },
+            "description": "获取指定订单的详细信息"
+          },
+          "response": []
+        },
+        {
+          "name": "获取订单列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders?status=&page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["orders"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "pending/active/completed/expired/cancelled"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "获取当前用户的订单列表"
+          },
+          "response": []
+        },
+        {
+          "name": "取消订单",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "cancel"]
+            },
+            "description": "取消pending状态的订单"
+          },
+          "response": []
+        },
+        {
+          "name": "获取短信验证码",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/sms",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "{{order_id}}", "sms"]
+            },
+            "description": "主动获取订单的短信验证码"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "用户相关",
+      "item": [
+        {
+          "name": "获取用户信息",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/profile",
+              "host": ["{{base_url}}"],
+              "path": ["user", "profile"]
+            },
+            "description": "获取当前用户的个人信息"
+          },
+          "response": []
+        },
+        {
+          "name": "获取积分余额",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/balance",
+              "host": ["{{base_url}}"],
+              "path": ["user", "balance"]
+            },
+            "description": "获取用户当前积分余额和交易记录"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "支付相关",
+      "item": [
+        {
+          "name": "获取充值套餐",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/points/packages",
+              "host": ["{{base_url}}"],
+              "path": ["points", "packages"]
+            },
+            "description": "获取所有可用的充值套餐"
+          },
+          "response": []
+        },
+        {
+          "name": "验证支付收据",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receipt_data\": \"base64_encoded_receipt\",\n  \"product_id\": \"com.sms.credits.100\",\n  \"transaction_id\": \"1000000123456789\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/verify-receipt",
+              "host": ["{{base_url}}"],
+              "path": ["verify-receipt"]
+            },
+            "description": "验证Apple IAP支付收据"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "系统相关",
+      "item": [
+        {
+          "name": "健康检查",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "检查API服务状态"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

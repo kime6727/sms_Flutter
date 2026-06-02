@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#3b82f6">
+    <title>云码 - 全球虚拟号码接码平台</title>
+    <meta name="description" content="云码H5版 - 支持Telegram、WhatsApp等200+平台的虚拟号码接码服务">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- 全局加载 -->
+    <div class="global-loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+    </div>
+
+    <!-- ==================== 页面容器 ==================== -->
+
+    <!-- 配置页面 -->
+    <div class="page" id="page-config"></div>
+
+    <!-- 登录页面 -->
+    <div class="page" id="page-login"></div>
+
+    <!-- 首页 - 服务列表 -->
+    <div class="page active" id="page-home">
+        <div class="page-header" style="justify-content:center;">
+            <h1>☁️ 云码接码</h1>
+        </div>
+        <div id="services-grid" class="service-grid">
+            <div class="empty-state">
+                <div class="empty-icon">⏳</div>
+                <p>加载服务中...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 国家列表 -->
+    <div class="page" id="page-countries"></div>
+
+    <!-- 购买确认 -->
+    <div class="page" id="page-buy"></div>
+
+    <!-- 订单列表 -->
+    <div class="page" id="page-orders">
+        <div class="page-header">
+            <h1>我的订单</h1>
+        </div>
+        <div id="orders-list"></div>
+    </div>
+
+    <!-- 订单详情 -->
+    <div class="page" id="page-order-detail"></div>
+
+    <!-- 个人中心 -->
+    <div class="page" id="page-profile"></div>
+
+    <!-- 充值 -->
+    <div class="page" id="page-recharge"></div>
+
+    <!-- 收藏夹 -->
+    <div class="page" id="page-favorites"></div>
+
+    <!-- 通知 -->
+    <div class="page" id="page-notifications"></div>
+
+    <!-- 设置 -->
+    <div class="page" id="page-settings"></div>
+
+    <!-- ==================== 底部导航 ==================== -->
+    <nav class="bottom-nav" id="bottom-nav">
+        <button class="nav-item active" data-page="home">
+            <span class="nav-icon">🏠</span>
+            <span>首页</span>
+        </button>
+        <button class="nav-item" data-page="orders">
+            <span class="nav-icon">📋</span>
+            <span>订单</span>
+        </button>
+        <button class="nav-item" data-page="profile">
+            <span class="nav-icon">👤</span>
+            <span>我的</span>
+        </button>
+    </nav>
+
+    <!-- Scripts (v2.0.1 - 修复退出登录自动登录问题) -->
+    <script src="js/utils.js?v=20260505"></script>
+    <script src="js/api.js?v=20260505"></script>
+    <script src="js/app.js?v=20260505"></script>
+</body>
+</html>

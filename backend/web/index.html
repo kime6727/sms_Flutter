@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云码 - 全球虚拟号码接码平台</title>
+    <meta name="description" content="云码是一款专业的全球虚拟号码接码App，支持Telegram、WhatsApp等200+平台，覆盖100+国家，实时接收短信验证码，安全便捷。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --primary-light: #1e293b;
+            --accent: #3b82f6;
+            --accent-light: #60a5fa;
+            --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --bg: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-dark: #0f172a;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --radius: 12px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ===== NAVIGATION ===== */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 16px 24px;
+            transition: all 0.3s ease;
+        }
+
+        .nav.scrolled {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: var(--shadow-sm);
+            padding: 12px 24px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent-gradient);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border-radius: 100px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: white;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--text);
+            border: 1.5px solid var(--border);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-large {
+            padding: 16px 36px;
+            font-size: 1.05rem;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text);
+        }
+
+        /* ===== HERO SECTION ===== */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 120px 24px 80px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
+        }
+
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .hero-bg .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.5;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            top: -10%;
+            right: -5%;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            bottom: -10%;
+            left: -10%;
+            animation-delay: -4s;
+        }
+
+        .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899);
+            top: 40%;
+            right: 20%;
+            animation-delay: -2s;
+            opacity: 0.3;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.05); }
+            66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+
+        .hero-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 100px;
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .hero-badge .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .hero h1 {
+            font-size: 3.8rem;
+            font-weight: 900;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 24px;
+        }
+
+        .hero h1 .gradient-text {
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-desc {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            margin-bottom: 40px;
+            line-height: 1.7;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 40px;
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Phone Mockup */
+        .phone-mockup {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .phone-frame {
+            width: 300px;
+            height: 620px;
+            background: var(--primary);
+            border-radius: 44px;
+            padding: 12px;
+            box-shadow: var(--shadow-xl), 0 0 0 1px rgba(0,0,0,0.1);
+            position: relative;
+            animation: phoneFloat 6s ease-in-out infinite;
+        }
+
+        @keyframes phoneFloat {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(1deg); }
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 28px;
+            background: var(--primary);
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+            border-radius: 36px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .app-header {
+            background: var(--accent-gradient);
+            padding: 48px 20px 20px;
+            color: white;
+        }
+
+        .app-header h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .app-header p {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        .app-balance {
+            background: white;
+            margin: -20px 16px 16px;
+            padding: 16px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .balance-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .balance-value {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .app-list {
+            padding: 0 16px;
+        }
+
+        .app-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            background: var(--bg-secondary);
+        }
+
+        .app-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .app-icon.telegram { background: #e3f2fd; }
+        .app-icon.whatsapp { background: #e8f5e9; }
+        .app-icon.google { background: #fce4ec; }
+        .app-icon.wechat { background: #f3e5f5; }
+
+        .app-info {
+            flex: 1;
+        }
+
+        .app-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+        }
+
+        .app-price {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .app-action {
+            padding: 6px 14px;
+            background: var(--accent);
+            color: white;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .notification-toast {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: white;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 85%;
+            animation: toastSlide 4s ease-in-out infinite;
+            z-index: 20;
+        }
+
+        @keyframes toastSlide {
+            0%, 100% { transform: translateX(-50%) translateY(-100px); opacity: 0; }
+            20% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            80% { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        .toast-icon {
+            width: 32px;
+            height: 32px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .toast-text {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .toast-code {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        /* ===== SECTIONS COMMON ===== */
+        section {
+            padding: 100px 24px;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 640px;
+            margin: 0 auto 64px;
+        }
+
+        .section-tag {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent);
+            border-radius: 100px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 2.6rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        .section-desc {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* ===== FEATURES ===== */
+        .features {
+            background: var(--bg);
+        }
+
+        .features-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 36px 28px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--accent-gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: transparent;
+        }
+
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-icon.blue { background: rgba(59, 130, 246, 0.1); }
+        .feature-icon.green { background: rgba(16, 185, 129, 0.1); }
+        .feature-icon.purple { background: rgba(139, 92, 246, 0.1); }
+        .feature-icon.orange { background: rgba(245, 158, 11, 0.1); }
+        .feature-icon.red { background: rgba(239, 68, 68, 0.1); }
+        .feature-icon.cyan { background: rgba(6, 182, 212, 0.1); }
+
+        .feature-card h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ===== SERVICES ===== */
+        .services {
+            background: var(--bg-secondary);
+            position: relative;
+        }
+
+        .services-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 16px;
+        }
+
+        .service-item {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px 16px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .service-item:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+            border-color: var(--accent-light);
+        }
+
+        .service-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 12px;
+        }
+
+        .service-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        /* ===== HOW IT WORKS ===== */
+        .how-it-works {
+            background: var(--bg);
+        }
+
+        .steps-grid {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 32px;
+            position: relative;
+        }
+
+        .step-card {
+            text-align: center;
+            position: relative;
+        }
+
+        .step-number {
+            width: 56px;
+            height: 56px;
+            background: var(--accent-gradient);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin: 0 auto 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .step-card h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .step-card p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .step-connector {
+            position: absolute;
+            top: 28px;
+            left: calc(50% + 28px);
+            width: calc(100% - 56px);
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-light));
+            opacity: 0.3;
+        }
+
+        .step-card:last-child .step-connector {
+            display: none;
+        }
+
+        /* ===== PRICING ===== */
+        .pricing {
+            background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg) 100%);
+        }
+
+        .pricing-grid {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .pricing-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 40px 32px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .pricing-card.popular {
+            border-color: var(--accent);
+            transform: scale(1.05);
+            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.15);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent-gradient);
+            color: white;
+            padding: 6px 20px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .pricing-card h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .pricing-card .price {
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--primary);
+            margin: 16px 0;
+        }
+
+        .pricing-card .price span {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin: 24px 0;
+            text-align: left;
+        }
+
+        .pricing-features li {
+            padding: 8px 0;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pricing-features li::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* ===== TESTIMONIALS ===== */
+        .testimonials {
+            background: var(--bg-dark);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .testimonials .section-title,
+        .testimonials .section-desc {
+            color: white;
+        }
+
+        .testimonials .section-desc {
+            opacity: 0.7;
+        }
+
+        .testimonials-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .testimonial-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            backdrop-filter: blur(10px);
+        }
+
+        .testimonial-stars {
+            color: #fbbf24;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+        }
+
+        .testimonial-text {
+            font-size: 1rem;
+            line-height: 1.7;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .author-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .author-info h4 {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .author-info p {
+            font-size: 0.85rem;
+            opacity: 0.6;
+        }
+
+        /* ===== CTA ===== */
+        .cta {
+            background: var(--accent-gradient);
+            padding: 100px 24px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-bg {
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .cta-content {
+            position: relative;
+            z-index: 1;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .cta h2 {
+            font-size: 2.8rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+        }
+
+        .cta p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        .cta .btn {
+            background: white;
+            color: var(--accent);
+            font-size: 1.1rem;
+            padding: 18px 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .cta .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            background: var(--primary);
+            color: white;
+            padding: 60px 24px 30px;
+        }
+
+        .footer-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 48px;
+            margin-bottom: 48px;
+        }
+
+        .footer-brand .logo {
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .footer-brand p {
+            opacity: 0.6;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        .footer-links h4 {
+            font-weight: 600;
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        .footer-links ul {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 12px;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: white;
+        }
+
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            font-size: 0.85rem;
+            opacity: 0.5;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+        .delay-4 { transition-delay: 0.4s; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1024px) {
+            .hero h1 {
+                font-size: 3rem;
+            }
+
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .services-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .steps-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .step-connector {
+                display: none;
+            }
+
+            .pricing-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .pricing-card.popular {
+                transform: scale(1);
+            }
+
+            .testimonials-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .footer-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .hero {
+                padding: 100px 20px 60px;
+                min-height: auto;
+            }
+
+            .hero-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 48px;
+            }
+
+            .hero h1 {
+                font-size: 2.4rem;
+            }
+
+            .hero-desc {
+                margin: 0 auto 32px;
+                font-size: 1.05rem;
+            }
+
+            .hero-buttons {
+                justify-content: center;
+            }
+
+            .hero-stats {
+                justify-content: center;
+                gap: 24px;
+            }
+
+            .phone-mockup {
+                order: -1;
+            }
+
+            .phone-frame {
+                width: 260px;
+                height: 540px;
+            }
+
+            section {
+                padding: 60px 20px;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .services-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 12px;
+            }
+
+            .service-item {
+                padding: 16px 8px;
+            }
+
+            .service-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1.2rem;
+            }
+
+            .steps-grid {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+                max-width: 400px;
+            }
+
+            .testimonials-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .cta h2 {
+                font-size: 2rem;
+            }
+
+            .footer-grid {
+                grid-template-columns: 1fr;
+                gap: 32px;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .stat-value {
+                font-size: 1.4rem;
+            }
+
+            .services-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .section-title {
+                font-size: 1.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="nav" id="nav">
+        <div class="nav-inner">
+            <a href="#" class="logo">
+                <div class="logo-icon">☁</div>
+                云码
+            </a>
+            <div class="nav-links">
+                <a href="#features">功能特色</a>
+                <a href="#services">支持平台</a>
+                <a href="#how-it-works">使用流程</a>
+                <a href="#pricing">价格方案</a>
+                <a href="#" class="btn btn-primary">下载 App</a>
+            </div>
+            <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-bg">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+        </div>
+        <div class="hero-grid">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span class="pulse"></span>
+                    全球 100+ 国家覆盖
+                </div>
+                <h1>
+                    全球虚拟号码<br>
+                    <span class="gradient-text">一键接码</span>平台
+                </h1>
+                <p class="hero-desc">
+                    云码是一款专业的 SMS 接码 App，支持 Telegram、WhatsApp、Google 等 200+ 平台，覆盖全球 100+ 国家，实时接收短信验证码，安全、快捷、稳定。
+                </p>
+                <div class="hero-buttons">
+                    <a href="#" class="btn btn-primary btn-large">
+                        <span>📱</span> 下载 iOS App
+                    </a>
+                    <a href="#how-it-works" class="btn btn-outline btn-large">
+                        了解更多
+                    </a>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-value">200+</span>
+                        <span class="stat-label">支持平台</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">100+</span>
+                        <span class="stat-label">覆盖国家</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">5s</span>
+                        <span class="stat-label">平均接码</span>
+                    </div>
+                </div>
+            </div>
+            <div class="phone-mockup">
+                <div class="phone-frame">
+                    <div class="phone-notch"></div>
+                    <div class="phone-screen">
+                        <div class="notification-toast">
+                            <div class="toast-icon">✉</div>
+                            <div class="toast-text">
+                                Telegram 验证码<br>
+                                <span class="toast-code">843921</span>
+                            </div>
+                        </div>
+                        <div class="app-header">
+                            <h3>云码接码</h3>
+                            <p>全球虚拟号码平台</p>
+                        </div>
+                        <div class="app-balance">
+                            <div>
+                                <div class="balance-label">我的积分</div>
+                                <div class="balance-value">12,580</div>
+                            </div>
+                            <div class="app-action">充值</div>
+                        </div>
+                        <div class="app-list">
+                            <div class="app-item">
+                                <div class="app-icon telegram">✈</div>
+                                <div class="app-info">
+                                    <div class="app-name">Telegram</div>
+                                    <div class="app-price">$0.50 起</div>
+                                </div>
+                                <div class="app-action">购买</div>
+                            </div>
+                            <div class="app-item">
+                                <div class="app-icon whatsapp">💬</div>
+                                <div class="app-info">
+                                    <div class="app-name">WhatsApp</div>
+                                    <div class="app-price">$0.45 起</div>
+                                </div>
+                                <div class="app-action">购买</div>
+                            </div>
+                            <div class="app-item">
+                                <div class="app-icon google">G</div>
+                                <div class="app-info">
+                                    <div class="app-name">Google</div>
+                                    <div class="app-price">$0.60 起</div>
+                                </div>
+                                <div class="app-action">购买</div>
+                            </div>
+                            <div class="app-item">
+                                <div class="app-icon wechat">💬</div>
+                                <div class="app-info">
+                                    <div class="app-name">WeChat</div>
+                                    <div class="app-price">$0.55 起</div>
+                                </div>
+                                <div class="app-action">购买</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-header fade-in">
+            <div class="section-tag">核心功能</div>
+            <h2 class="section-title">为什么选择云码？</h2>
+            <p class="section-desc">我们提供业界领先的虚拟号码接码服务，让您的业务无国界</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card fade-in delay-1">
+                <div class="feature-icon blue">🌍</div>
+                <h3>全球覆盖</h3>
+                <p>支持 100+ 国家和地区的虚拟号码，无论您身在何处，都能轻松获取当地号码接收验证码。</p>
+            </div>
+            <div class="feature-card fade-in delay-2">
+                <div class="feature-icon green">⚡</div>
+                <h3>极速接码</h3>
+                <p>平均 5 秒内接收短信验证码，实时推送通知，无需漫长等待，效率倍增。</p>
+            </div>
+            <div class="feature-card fade-in delay-3">
+                <div class="feature-icon purple">🔒</div>
+                <h3>安全隐私</h3>
+                <p>无需提供真实手机号，保护您的个人隐私，避免骚扰电话和短信。</p>
+            </div>
+            <div class="feature-card fade-in delay-1">
+                <div class="feature-icon orange">📱</div>
+                <h3>多平台支持</h3>
+                <p>支持 Telegram、WhatsApp、Google、Facebook、Twitter 等 200+ 主流平台注册验证。</p>
+            </div>
+            <div class="feature-card fade-in delay-2">
+                <div class="feature-icon red">💰</div>
+                <h3>灵活计费</h3>
+                <p>积分制计费，按需购买，支持 Apple 内购充值，用多少花多少，无隐藏费用。</p>
+            </div>
+            <div class="feature-card fade-in delay-3">
+                <div class="feature-icon cyan">🛒</div>
+                <h3>批量购买</h3>
+                <p>支持批量预购号码，一次购买多个，随用随激活，满足大规模业务需求。</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section class="services" id="services">
+        <div class="section-header fade-in">
+            <div class="section-tag">支持平台</div>
+            <h2 class="section-title">200+ 平台一键接码</h2>
+            <p class="section-desc">覆盖全球主流社交、电商、金融平台，满足您的一切接码需求</p>
+        </div>
+        <div class="services-grid">
+            <div class="service-item fade-in delay-1">
+                <div class="service-icon" style="background: #e3f2fd;">✈</div>
+                <div class="service-name">Telegram</div>
+            </div>
+            <div class="service-item fade-in delay-2">
+                <div class="service-icon" style="background: #e8f5e9;">💬</div>
+                <div class="service-name">WhatsApp</div>
+            </div>
+            <div class="service-item fade-in delay-3">
+                <div class="service-icon" style="background: #fce4ec;">G</div>
+                <div class="service-name">Google</div>
+            </div>
+            <div class="service-item fade-in delay-1">
+                <div class="service-icon" style="background: #e8eaf6;">f</div>
+                <div class="service-name">Facebook</div>
+            </div>
+            <div class="service-item fade-in delay-2">
+                <div class="service-icon" style="background: #e0f2f1;">𝕏</div>
+                <div class="service-name">Twitter/X</div>
+            </div>
+            <div class="service-item fade-in delay-3">
+                <div class="service-icon" style="background: #f3e5f5;">📷</div>
+                <div class="service-name">Instagram</div>
+            </div>
+            <div class="service-item fade-in delay-1">
+                <div class="service-icon" style="background: #fff3e0;">▶</div>
+                <div class="service-name">YouTube</div>
+            </div>
+            <div class="service-item fade-in delay-2">
+                <div class="service-icon" style="background: #e0f7fa;">T</div>
+                <div class="service-name">TikTok</div>
+            </div>
+            <div class="service-item fade-in delay-3">
+                <div class="service-icon" style="background: #f1f8e9;">📌</div>
+                <div class="service-name">Pinterest</div>
+            </div>
+            <div class="service-item fade-in delay-1">
+                <div class="service-icon" style="background: #fce4ec;">💼</div>
+                <div class="service-name">LinkedIn</div>
+            </div>
+            <div class="service-item fade-in delay-2">
+                <div class="service-icon" style="background: #e8eaf6;">🎮</div>
+                <div class="service-name">Discord</div>
+            </div>
+            <div class="service-item fade-in delay-3">
+                <div class="service-icon" style="background: #e3f2fd;">🛒</div>
+                <div class="service-name">Amazon</div>
+            </div>
+            <div class="service-item fade-in delay-1">
+                <div class="service-icon" style="background: #fff8e1;">🍎</div>
+                <div class="service-name">Apple ID</div>
+            </div>
+            <div class="service-item fade-in delay-2">
+                <div class="service-icon" style="background: #e0f2f1;">M</div>
+                <div class="service-name">Microsoft</div>
+            </div>
+            <div class="service-item fade-in delay-3">
+                <div class="service-icon" style="background: #f3e5f5;">N</div>
+                <div class="service-name">Netflix</div>
+            </div>
+            <div class="service-item fade-in delay-1">
+                <div class="service-icon" style="background: #e8f5e9;">S</div>
+                <div class="service-name">Spotify</div>
+            </div>
+            <div class="service-item fade-in delay-2">
+                <div class="service-icon" style="background: #fce4ec;">P</div>
+                <div class="service-name">PayPal</div>
+            </div>
+            <div class="service-item fade-in delay-3">
+                <div class="service-icon" style="background: #e3f2fd;">+</div>
+                <div class="service-name">更多...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="section-header fade-in">
+            <div class="section-tag">使用流程</div>
+            <h2 class="section-title">四步轻松接码</h2>
+            <p class="section-desc">简单直观的操作流程，无需复杂设置，新手也能秒上手</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step-card fade-in delay-1">
+                <div class="step-number">1</div>
+                <div class="step-connector"></div>
+                <h3>选择服务</h3>
+                <p>在 App 中选择您需要注册的平台，如 Telegram、WhatsApp 等</p>
+            </div>
+            <div class="step-card fade-in delay-2">
+                <div class="step-number">2</div>
+                <div class="step-connector"></div>
+                <h3>挑选国家</h3>
+                <p>从 100+ 国家中选择号码归属地，查看实时价格和库存</p>
+            </div>
+            <div class="step-card fade-in delay-3">
+                <div class="step-number">3</div>
+                <div class="step-connector"></div>
+                <h3>购买激活</h3>
+                <p>使用积分购买号码，点击激活即可获取虚拟手机号</p>
+            </div>
+            <div class="step-card fade-in delay-4">
+                <div class="step-number">4</div>
+                <h3>接收验证码</h3>
+                <p>在注册页面填写获取的号码，App 实时推送验证码</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing" id="pricing">
+        <div class="section-header fade-in">
+            <div class="section-tag">价格方案</div>
+            <h2 class="section-title">灵活的积分套餐</h2>
+            <p class="section-desc">1 美元 = 100 积分，按需充值，用多少花多少，无最低消费</p>
+        </div>
+        <div class="pricing-grid">
+            <div class="pricing-card fade-in delay-1">
+                <h3>入门版</h3>
+                <div class="price">$4.99<span> / 500积分</span></div>
+                <ul class="pricing-features">
+                    <li>支持所有平台接码</li>
+                    <li>100+ 国家可选</li>
+                    <li>5秒极速接码</li>
+                    <li>7×24 小时服务</li>
+                </ul>
+                <a href="#" class="btn btn-outline" style="width: 100%;">选择套餐</a>
+            </div>
+            <div class="pricing-card popular fade-in delay-2">
+                <div class="popular-badge">最受欢迎</div>
+                <h3>标准版</h3>
+                <div class="price">$9.99<span> / 1100积分</span></div>
+                <ul class="pricing-features">
+                    <li>支持所有平台接码</li>
+                    <li>100+ 国家可选</li>
+                    <li>5秒极速接码</li>
+                    <li>7×24 小时服务</li>
+                    <li>赠送 10% 额外积分</li>
+                </ul>
+                <a href="#" class="btn btn-primary" style="width: 100%;">选择套餐</a>
+            </div>
+            <div class="pricing-card fade-in delay-3">
+                <h3>专业版</h3>
+                <div class="price">$19.99<span> / 2500积分</span></div>
+                <ul class="pricing-features">
+                    <li>支持所有平台接码</li>
+                    <li>100+ 国家可选</li>
+                    <li>5秒极速接码</li>
+                    <li>7×24 小时服务</li>
+                    <li>赠送 25% 额外积分</li>
+                    <li>优先客服支持</li>
+                </ul>
+                <a href="#" class="btn btn-outline" style="width: 100%;">选择套餐</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials -->
+    <section class="testimonials">
+        <div class="section-header fade-in">
+            <div class="section-tag" style="background: rgba(255,255,255,0.1); color: white;">用户评价</div>
+            <h2 class="section-title">用户怎么说</h2>
+            <p class="section-desc">来自全球用户的真实反馈</p>
+        </div>
+        <div class="testimonials-grid">
+            <div class="testimonial-card fade-in delay-1">
+                <div class="testimonial-stars">★★★★★</div>
+                <p class="testimonial-text">"做跨境电商需要注册很多平台的账号，云码帮我解决了大麻烦。号码稳定，接码速度快，价格也很合理。"</p>
+                <div class="testimonial-author">
+                    <div class="author-avatar">李</div>
+                    <div class="author-info">
+                        <h4>李先生</h4>
+                        <p>跨境电商从业者</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card fade-in delay-2">
+                <div class="testimonial-stars">★★★★★</div>
+                <p class="testimonial-text">"界面简洁好用，充值方便，支持 Apple 内购。批量购买功能太实用了，一次买十个号码慢慢用。"</p>
+                <div class="testimonial-author">
+                    <div class="author-avatar">王</div>
+                    <div class="author-info">
+                        <h4>王小姐</h4>
+                        <p>社交媒体运营</p>
+                    </div>
+                </div>
+            </div>
+            <div class="testimonial-card fade-in delay-3">
+                <div class="testimonial-stars">★★★★★</div>
+                <p class="testimonial-text">"对比了好几个接码平台，云码的覆盖国家最全，价格最透明。客服响应也很快，有问题马上解决。"</p>
+                <div class="testimonial-author">
+                    <div class="author-avatar">张</div>
+                    <div class="author-info">
+                        <h4>张先生</h4>
+                        <p>软件开发工程师</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="cta-bg"></div>
+        <div class="cta-content">
+            <h2>立即下载云码 App</h2>
+            <p>开启您的全球接码之旅，新用户注册即送 100 积分</p>
+            <a href="#" class="btn">
+                <span>🍎</span> App Store 下载
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="#" class="logo">
+                    <div class="logo-icon">☁</div>
+                    云码
+                </a>
+                <p>全球领先的虚拟号码接码平台，为个人和企业提供安全、快捷、稳定的短信验证码接收服务。</p>
+            </div>
+            <div class="footer-links">
+                <h4>产品</h4>
+                <ul>
+                    <li><a href="#features">功能特色</a></li>
+                    <li><a href="#services">支持平台</a></li>
+                    <li><a href="#pricing">价格方案</a></li>
+                    <li><a href="#">下载 App</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>支持</h4>
+                <ul>
+                    <li><a href="#">帮助中心</a></li>
+                    <li><a href="#">使用教程</a></li>
+                    <li><a href="#">常见问题</a></li>
+                    <li><a href="#">联系客服</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>关于</h4>
+                <ul>
+                    <li><a href="#">关于我们</a></li>
+                    <li><a href="#">隐私政策</a></li>
+                    <li><a href="#">服务条款</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2026 云码 YunMa. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        const nav = document.getElementById('nav');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                nav.classList.add('scrolled');
+            } else {
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // Fade in animation on scroll
+        const fadeElements = document.querySelectorAll('.fade-in');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        fadeElements.forEach(el => observer.observe(el));
+
+        // Mobile menu toggle
+        function toggleMenu() {
+            const navLinks = document.querySelector('.nav-links');
+            navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+            navLinks.style.position = 'absolute';
+            navLinks.style.top = '100%';
+            navLinks.style.left = '0';
+            navLinks.style.right = '0';
+            navLinks.style.flexDirection = 'column';
+            navLinks.style.background = 'rgba(255,255,255,0.95)';
+            navLinks.style.backdropFilter = 'blur(20px)';
+            navLinks.style.padding = '20px';
+            navLinks.style.boxShadow = 'var(--shadow-lg)';
+            navLinks.style.gap = '16px';
+        }
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>

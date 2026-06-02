@@ -1,0 +1,55 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Logs
+*.log
+logs/
+temp_web/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backend
+backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/logs/*
+!backend/logs/.gitkeep
+backend/vendor/
+
+# Flutter
+app_Flutter/.dart_tool/
+app_Flutter/.flutter-plugins
+app_Flutter/.flutter-plugins-dependencies
+app_Flutter/.packages
+app_Flutter/build/
+app_Flutter/ios/Pods/
+app_Flutter/ios/.symlinks/
+app_Flutter/android/.gradle/
+app_Flutter/android/app/debug/
+app_Flutter/android/app/profile/
+app_Flutter/android/app/release/
+
+# Kiro
+.kiro/specs/*/
+
+# Backup
+*.backup
+*.bak
+*.old
+
+# Temporary
+tmp/
+temp/
+*.tmp

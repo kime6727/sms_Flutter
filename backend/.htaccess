@@ -1,0 +1,73 @@
+# 启用 mod_rewrite
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 排除 admin 目录
+    RewriteCond %{REQUEST_URI} ^/admin [NC]
+    RewriteRule ^ - [L]
+
+    # 排除其他静态文件和目录
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/admin
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+</IfModule>
+
+# 设置字符编码
+AddDefaultCharset utf-8
+
+# 禁用目录列表
+Options -Indexes
+
+# 设置 MIME 类型
+AddType application/json .json
+AddType text/plain .txt
+
+# 缓存控制 - 包括 webp 和 svg
+<FilesMatch "\.(jpg|jpeg|png|gif|ico|css|js|webp|svg)$">
+    Header set Cache-Control "max-age=31536000, public"
+</FilesMatch>
+
+# 禁止访问敏感文件
+<FilesMatch "^\.(env|git|htaccess|htpasswd)|config\.php|database\.php">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 保护测试文件（生产环境应删除这些文件）
+<FilesMatch "^test_.*\.php$">
+    Order deny,allow
+    Deny from all
+    Allow from 127.0.0.1 ::1
+</FilesMatch>
+
+# 保护 SQL 文件
+<FilesMatch "\.(sql|sql\.zip)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 保护备份文件
+<FilesMatch "\.(bak|backup|old|swp)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 安全响应头
+<IfModule mod_headers.c>
+    # 防止 MIME 类型嗅探
+    Header always set X-Content-Type-Options "nosniff"
+    # XSS 保护
+    Header always set X-Frame-Options "SAMEORIGIN"
+    # 内容安全策略 - 允许前端跨域请求 API
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://smsapi2.niceapp.eu.cc https://cdn.hero-sms.com data: blob:; connect-src 'self' https://smsapi2.niceapp.eu.cc http://localhost:* http://127.0.0.1:*; font-src 'self' data:;"
+</IfModule>
+
+# PHP 设置（如果允许）
+<IfModule mod_php.c>
+    php_flag display_errors off
+    php_value upload_max_filesize 2M
+    php_value post_max_size 2M
+    php_value max_execution_time 30
+    php_value memory_limit 64M
+</IfModule>
