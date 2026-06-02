@@ -1,12 +1,19 @@
 -- NOTE: 已移除所有 FOREIGN KEY 约束（TiDB Cloud 默认不支持）
 -- 注: FOREIGN KEY 的引用完整性由应用层 PHP 代码管理，删除它们对业务无影响
 -- ======================================================================
+-- ⚠️  使用前必读：
+--   TiDB Cloud SQL Editor 不允许 CREATE DATABASE，请先在 UI 建库：
+--     Cluster -> SQL Editor -> 顶部 database 下拉 -> Create database
+--     名字填: sms_receiver
+--   然后顶部 database 选 sms_receiver，再执行本文件
+--
 -- 用法:
---   1. 复制下面所有内容
---   2. 打开 TiDB Cloud 控制台 -> Cluster -> SQL Editor
---   3. 粘贴, 点击 Run
+--   1. 先在 TiDB Cloud UI 创建 database: sms_receiver
+--   2. SQL Editor 顶部 database 选 sms_receiver
+--   3. 复制下面所有内容到 SQL Editor -> 点击 Run
 -- 适用: MySQL 5.7+ / MySQL 8.0 / TiDB Cloud
 -- 包含: 21 张基础表 + 8 次增量迁移 + 25+ 索引 + 初始数据
+-- 注意: 所有 FOREIGN KEY 约束已移除（TiDB Cloud 默认不支持）
 -- ======================================================================
 
 -- Part A: 基础 schema (21 张表 + 初始数据)
@@ -22,12 +29,6 @@
 -- ============================================
 
 -- 创建数据库（如果不存在）
-CREATE DATABASE IF NOT EXISTS `sms_receiver` 
-  DEFAULT CHARACTER SET utf8mb4 
-  DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE `sms_receiver`;
-
 -- 设置 SQL 模式
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
