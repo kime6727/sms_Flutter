@@ -1,0 +1,20 @@
+# Dokploy 部署时不要打包进镜像的文件
+.env
+.env.local
+*.bak
+*.old
+*.swp
+*.log
+.git/
+.idea/
+.vscode/
+tests/
+scripts/
+doc/
+node_modules/
+.gitignore
+.gitattributes
+README.md
+*.md
+check_*.php
+debug.php
