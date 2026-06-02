@@ -33,47 +33,93 @@
 
 ### 1.5 初始化数据库表结构
 
-数据库服务跑起来后，需要执行 SQL 初始化脚本。两种方式二选一：
+打开浏览器，按下面**三选一**操作即可。**不需要 Mac 终端，不需要安装任何东西。**
 
-**方式 A：用 Dokploy 的 Web Terminal（推荐）**
+#### 🟢 方式 ①：用 TiDB Cloud 网页 SQL Editor（推荐，全程鼠标）
 
-1. 进入 MySQL 服务 → **Exec** 标签
-2. 输入命令：
-   ```bash
-   # 先把所有迁移文件上传到容器（或在镜像里 COPY）
-   # 然后在容器内执行：
-   mysql -u sms_user -p sms_receiver < /path/to/all_migrations.sql
-   ```
-   更简单的方式是用 `mysql` 客户端连接后，逐个 source：
+1. 打开 https://tidbcloud.com 登录
+2. 左侧 **Clusters** → 进你的 Cluster
+3. 顶部 **SQL Editor** 标签
+4. 左上角确认选中的是你要用的 database（建议新建一个 `sms_receiver`，不要用 `sys`）
+5. 新建 query：
+   - 点击浏览器打开下面这个链接，全选 + 复制：
+     **https://raw.githubusercontent.com/kime6727/sms_Flutter/main/backend/database.sql**
+   - 把内容粘贴到 SQL Editor
+6. 点击右上角 **Run**（或按 Ctrl/Cmd + Enter）
+7. 等待 5-30 秒，看到 "Query executed successfully" 即可
 
-**方式 B：从本地用 mysql 客户端连接（更直观）**
+> 💡 那个链接的 `database.sql` 是预先合并好的（21 张基础表 + 8 次迁移 = 26 张表 + 20 个索引 + 1 个初始 INSERT，外键已去掉兼容 TiDB），**30KB**，单文件一键跑完。
+
+#### 🟡 方式 ②：用 Sequel Ace / TablePlus 等 GUI
+
+需要在你 Mac 上装一个数据库客户端（这两个是免费的）：
+
+- **Sequel Ace**: `brew install --cask sequel-ace`
+- **TablePlus**: `brew install --cask tableplus`
+
+连接配置：
+
+| 字段 | 值 |
+|---|---|
+| Host | `gateway01.ap-southeast-1.prod.alicloud.tidbcloud.com` |
+| Port | `4000` |
+| User | `2tNw6XTWxveXcVU.root` |
+| Password | 你的密码 |
+| Database | `sys`（先连这个进去） |
+| SSL | Require / Verify CA，CA 选 `/etc/ssl/cert.pem` |
+
+连上后：
+1. 选 Query → New Query
+2. 粘贴方式 ① 那个链接里的 SQL
+3. 点 Execute
+4. 选 database `sms_receiver` → 看 Tables 标签，应该有 20+ 张
+
+#### 🟠 方式 ③：用 mysql 命令行（仅限你已经有客户端的情况）
 
 ```bash
-# 假设 MySQL 容器已经通过 Dokploy 暴露了 3306 端口，或你用 SSH 隧道连进去
-# 从项目仓库下载迁移文件并按文件名顺序执行：
-cd backend/migrations
-for f in $(ls *.sql | sort); do
-  echo "Applying $f"
-  mysql -h <dokploy-host> -P 3306 -u sms_user -p sms_receiver < "$f"
-done
+mysql --ssl-ca=/etc/ssl/cert.pem \
+      -h gateway01.ap-southeast-1.prod.alicloud.tidbcloud.com \
+      -P 4000 -u 2tNw6XTWxveXcVU.root -p \
+      < database.sql
 ```
 
-**迁移文件执行顺序**（按文件名字母序）：
+**推荐方式 ①**，最省事。
+
+执行完后，无论哪种方式，验证一下：连上 `sms_receiver` 库跑 `SHOW TABLES;`，应该看到类似：
 
 ```
-add_account_system_safe.sql
-add_account_system_simple.sql
-add_account_system.sql
-add_banners_table.sql
-add_countries_unique_index.sql
-add_performance_indexes.sql
-20260516_account_system_optimization.sql
-20260516_create_apple_transactions.sql
-20260516_create_topup_packages.sql
-20260602_add_rate_limits_and_reset_tokens.sql   ← 这次新增的安全表
++----------------------------+
+| Tables_in_sms_receiver     |
++----------------------------+
+| admin_logs                 |
+| admins                     |
+| apple_transactions         |
+| banners                    |
+| countries                  |
+| credit_transactions        |
+| devices                    |
+| email_verification_codes   |
+| favorites                  |
+| membership_levels          |
+| notifications              |
+| operation_logs             |
+| orders                     |
+| password_reset_tokens      |  ← 本次新增
+| payment_configs            |
+| payment_records            |
+| rate_limits                |  ← 本次新增
+| service_coefficients       |
+| service_countries          |
+| services                   |
+| sms_messages               |
+| system_settings            |
+| topup_packages             |
+| user_tokens                |
+| users                      |
++----------------------------+
 ```
 
-> 💡 提示：可以一次性把所有 SQL 合并后执行，更不易出错。
+> 💡 如果某些表已经存在（之前跑过部分迁移），会因 `IF NOT EXISTS` 跳过，是正常现象。
 
 ### 1.6 使用 TiDB Cloud 等云数据库（SSL 必须）
 
