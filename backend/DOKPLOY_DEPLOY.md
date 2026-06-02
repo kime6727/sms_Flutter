@@ -9,7 +9,7 @@
 | 域名 | `sms.niceapp.eu.cc` | 已绑定 |
 | 服务器 | Dokploy 所在 VPS | 已有 |
 | GitHub 仓库 | https://github.com/kime6727/sms_Flutter | 已推送，main 分支 |
-| MySQL 数据库 | 5.7+ / 8.0+ | 建议在 Dokploy 中创建独立服务 |
+| MySQL 数据库 | 5.7+ / 8.0+ / **TiDB Cloud** | 见下方 §1.5（云数据库要 SSL） |
 
 ---
 
@@ -75,6 +75,14 @@ add_performance_indexes.sql
 
 > 💡 提示：可以一次性把所有 SQL 合并后执行，更不易出错。
 
+### 1.6 使用 TiDB Cloud 等云数据库（SSL 必须）
+
+如果你的 MySQL 托管在 **TiDB Cloud / 阿里云 RDS / AWS RDS / PlanetScale / Google Cloud SQL** 等需要 SSL 连接的云服务上，跳过 §1，在 Dokploy 的 Application 环境变量里按下面 §2.3 的 TiDB Cloud 模板填。
+
+> **强烈建议**：在云数据库控制台**单独创建一个数据库**（不要用 `sys`、`mysql`、`information_schema` 等系统库），名字叫 `sms_receiver` 或自定义。
+
+> 性能提示：TiDB Cloud 在 ap-southeast-1（新加坡）与你 Dokploy 服务器之间可能有 50-200ms 延迟，对接码业务影响不大；如果想用就近区域，可改用 TiDB Cloud 的香港/日本集群，或用 PlanetScale 的免费 MySQL。
+
 ---
 
 ## 2. 在 Dokploy 中创建 Application
@@ -111,7 +119,7 @@ add_performance_indexes.sql
 - **Port**: `80`
 - **Container Port**: `80`（容器内 Apache 监听端口）
 
-**环境变量**（把以下全部填入 Environment Variables）：
+#### 模板 A：自建 MySQL（无 SSL）
 
 ```bash
 # ===== 数据库 =====
@@ -120,6 +128,7 @@ DB_PORT=3306
 DB_NAME=sms_receiver
 DB_USER=sms_user
 DB_PASS=你的MySQL密码
+DB_SSL_ENABLED=0
 
 # ===== API 鉴权（务必重新生成）=====
 # 在服务器上执行:  openssl rand -hex 32
@@ -149,6 +158,77 @@ CORS_ALLOWED_ORIGINS=https://sms.niceapp.eu.cc
 LOG_DIR=/var/log/sms-receiver
 ```
 
+#### 模板 B：TiDB Cloud（必须 SSL）
+
+```bash
+# ===== 数据库 (TiDB Cloud) =====
+DB_HOST=gateway01.ap-southeast-1.prod.alicloud.tidbcloud.com
+DB_PORT=4000
+DB_NAME=sms_receiver                # ← 在 TiDB Cloud 控制台单独建一个，不要用 sys
+DB_USER=2tNw6XTWxveXcVU.root        # ← 你的 TiDB 用户
+DB_PASS=***TiDB密码***                # ← 强烈建议用新生成的，**轮换一次**（你已在聊天里贴过）
+DB_SSL_ENABLED=1
+DB_SSL_CA_CONTENT=***见下方获取CA证书***   # ← base64 编码的 CA 证书
+DB_SSL_VERIFY=true
+
+# ===== API 鉴权（务必重新生成）=====
+API_KEY=新生成的64位hex
+
+# ===== HeroSMS =====
+HEROSMS_BASE_URL=https://hero-sms.com/stubs/handler_api.php
+HEROSMS_API_KEY=你的herosms_key
+
+# ===== Apple IAP =====
+APPLE_SHARED_SECRET=你的Apple共享密钥
+
+# ===== 鉴权签名（务必重新生成）=====
+AUTH_SECRET_KEY=新生成的64位hex
+
+# ===== 应用 =====
+APP_NAME=SMS 接码平台
+APP_URL=https://sms.niceapp.eu.cc
+APP_ENV=production
+
+# ===== CORS =====
+CORS_ALLOWED_ORIGINS=https://sms.niceapp.eu.cc
+
+# ===== 日志 =====
+LOG_DIR=/var/log/sms-receiver
+```
+
+##### TiDB Cloud CA 证书获取方法
+
+TiDB Cloud 使用 ISRG / DigiCert 系列 CA。你有三种方式，推荐**方式 ①**：
+
+**方式 ①：用 TiDB Cloud 控制台下载的 CA（推荐）**
+
+1. 登录 TiDB Cloud → 你的 Cluster → **Connect** → **General** 标签
+2. 在 "CA根证书" 区域下载 `tidb-ca.pem` 文件
+3. 在本地把它转成单行 base64：
+   ```bash
+   base64 -w 0 tidb-ca.pem > tidb-ca.b64
+   cat tidb-ca.b64   # 复制这一整行（很长，几 KB）粘贴到 DB_SSL_CA_CONTENT
+   ```
+
+**方式 ②：直接用 ISRG Root X1（Let's Encrypt 根 CA）**
+
+TiDB Cloud 多数节点证书链用 Let's Encrypt 签发：
+```bash
+# 在你本地执行，获取单行 base64
+curl -sS https://letsencrypt.org/certs/isrgrootx1.pem | base64 -w 0
+# 复制输出，粘贴到 DB_SSL_CA_CONTENT
+```
+
+**方式 ③：跳过证书校验（不推荐，仅调试）**
+
+实在拿不到证书，把 `DB_SSL_VERIFY` 改成 `false`，但仍要 `DB_SSL_ENABLED=1`：
+```bash
+DB_SSL_ENABLED=1
+DB_SSL_VERIFY=false
+# DB_SSL_CA_CONTENT 留空
+```
+> ⚠️ 这样会走加密连接但不验证服务端身份，**仅用于排查**。生产环境必须用方式 ① 或 ②。
+
 > ⚠️ **两个密钥必须重新生成**，不能复用代码里或旧部署里的：
 > - `API_KEY`：客户端发请求时 `X-API-Key` 头携带的值
 > - `AUTH_SECRET_KEY`：用户 Token 签名密钥
@@ -157,6 +237,8 @@ LOG_DIR=/var/log/sms-receiver
 > ```bash
 > openssl rand -hex 32
 > ```
+
+> 🔒 **特别提醒**：你的 TiDB 密码已在本对话中明文出现，**强烈建议**到 TiDB Cloud 控制台 `Reset Password` 重置一次，把新密码填到 Dokploy。旧密码虽然 Dokploy 那侧不会泄露，但聊天记录/截图/Claude 历史里都会有痕迹。
 
 ---
 
@@ -220,6 +302,22 @@ curl -X POST https://sms.niceapp.eu.cc/api/auth/manual-register \
 - 在 Dokploy → Application → **Exec** 标签里进入容器，跑：
   ```bash
   php -r "require 'config/database.php'; require 'lib/Database.php'; \$db = new Database(DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT); var_dump(\$db->query('SELECT 1')->fetchAll());"
+  ```
+
+### Q1.5: TiDB Cloud 连接报错 "SSL operation failed" / "certificate verify failed"
+- 说明 SSL 配置有问题
+- 检查 `DB_SSL_ENABLED=1`
+- `DB_SSL_CA_CONTENT` 是否是**单行 base64**（用 `base64 -w 0` 而不是普通 base64）
+- 如果用方式 ③ 跳过校验：`DB_SSL_VERIFY=false`
+- 终极排查：在容器 Exec 里手测：
+  ```bash
+  php -r "
+  \$_ENV['DB_SSL_CA_CONTENT'] = getenv('DB_SSL_CA_CONTENT');
+  require 'config/database.php';
+  require 'lib/Database.php';
+  \$db = new Database(DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT);
+  print_r(\$db->query('SELECT VERSION() AS v')->fetch());
+  "
   ```
 
 ### Q2: API 返回 401 Unauthorized

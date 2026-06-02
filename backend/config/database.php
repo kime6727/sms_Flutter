@@ -40,6 +40,19 @@ define('DB_NAME', $dbName);
 define('DB_USER', $dbUser);
 define('DB_PASS', $dbPass);
 
+// SSL 配置（云数据库如 TiDB Cloud / 阿里云 RDS / AWS RDS 需要）
+// 优先从 .env 读，若为空则从系统环境变量读
+$dbSslCa = $env['DB_SSL_CA'] ?? getenv('DB_SSL_CA') ?: '';
+$dbSslCaContent = $env['DB_SSL_CA_CONTENT'] ?? getenv('DB_SSL_CA_CONTENT') ?: '';
+$dbSslVerify = strtolower((string)($env['DB_SSL_VERIFY'] ?? getenv('DB_SSL_VERIFY') ?: 'true'));
+$dbSslVerify = !in_array($dbSslVerify, ['0', 'false', 'no', 'off'], true);
+$dbSslEnabled = !empty($dbSslCa) || !empty($dbSslCaContent) || getenv('DB_SSL_ENABLED') === '1';
+
+define('DB_SSL_ENABLED', $dbSslEnabled);
+define('DB_SSL_CA', $dbSslCa);
+define('DB_SSL_CA_CONTENT', $dbSslCaContent);
+define('DB_SSL_VERIFY', $dbSslVerify);
+
 // API 配置 - 生产环境必须从 .env 读取，不允许使用默认值
 $apiKey = $env['API_KEY'] ?? '';
 

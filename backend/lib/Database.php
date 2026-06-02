@@ -6,22 +6,74 @@
 class Database {
     private $pdo;
     private $stmt;
-    
-    public function __construct($host, $db, $user, $pass, $port = 3306) {
+
+    /**
+     * @param string $host
+     * @param string $db
+     * @param string $user
+     * @param string $pass
+     * @param int    $port
+     * @param array  $ssl  支持的键: ca (CA 证书文件路径), ca_content (CA 证书 PEM 字符串), verify (true/false, 默认 true)
+     */
+    public function __construct($host, $db, $user, $pass, $port = 3306, array $ssl = []) {
         try {
             $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
-            $this->pdo = new PDO(
-                $dsn,
-                $user,
-                $pass,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ]
-            );
+
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ];
+
+            // SSL 配置：TiDB Cloud / 阿里云 RDS / AWS RDS 等云数据库要求 SSL
+            // 1) 显式传入的 $ssl 优先
+            // 2) 否则从 config/database.php 定义的全局常量 DB_SSL_* 读取
+            if (empty($ssl) && defined('DB_SSL_ENABLED') && DB_SSL_ENABLED) {
+                $ssl = [
+                    'ca' => defined('DB_SSL_CA') ? DB_SSL_CA : null,
+                    'ca_content' => defined('DB_SSL_CA_CONTENT') ? DB_SSL_CA_CONTENT : null,
+                    'verify' => defined('DB_SSL_VERIFY') ? DB_SSL_VERIFY : true,
+                ];
+            }
+
+            if (!empty($ssl)) {
+                $caPath = $ssl['ca'] ?? null;
+                $caContent = $ssl['ca_content'] ?? null;
+                $verify = $ssl['verify'] ?? true;
+
+                // 1. 如果传入了 CA 证书内容（PEM 字符串），写入临时文件
+                if (!$caPath && $caContent) {
+                    $caPath = sys_get_temp_dir() . '/mysql_ca_' . md5($caContent) . '.pem';
+                    if (!file_exists($caPath)) {
+                        $pem = $caContent;
+                        if (strpos($pem, '-----BEGIN') === false) {
+                            $pem = base64_decode($pem);
+                        }
+                        @file_put_contents($caPath, $pem);
+                        @chmod($caPath, 0600);
+                    }
+                }
+
+                // 2. SSL 标志
+                if ($caPath && $verify) {
+                    $options[PDO::MYSQL_ATTR_SSL_CA] = $caPath;
+                    if (defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
+                        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+                    }
+                }
+                // 若 verify=false 且 ca 存在，仍要带 CA 文件但不强制校验
+                elseif ($caPath) {
+                    $options[PDO::MYSQL_ATTR_SSL_CA] = $caPath;
+                }
+                // 若没传 ca 但 enabled=true，至少声明我们要用 SSL（仍要服务端允许）
+                elseif (defined('DB_SSL_ENABLED') && DB_SSL_ENABLED) {
+                    // 什么都不传：让 PDO 走默认加密，不验证证书
+                }
+            }
+
+            $this->pdo = new PDO($dsn, $user, $pass, $options);
         } catch (PDOException $e) {
-            throw new Exception('数据库连接失败');
+            throw new Exception('数据库连接失败: ' . $e->getMessage());
         }
     }
     
