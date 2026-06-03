@@ -90,6 +90,11 @@ if ($path === '/install' && $method === 'GET') {
             $result = $installer->install($db);
             $installer->cleanup();
             $installed = $result['verified'];
+            if (!$installed) {
+                $errCount = count($result['errors'] ?? []);
+                $firstErr = $errCount > 0 ? $result['errors'][0]['error'] : '未知错误';
+                $installError = "{$firstErr}（共 {$errCount} 条 SQL 失败，执行了 {$result['executed']} 条，跳过 {$result['skipped']} 条）";
+            }
         } catch (Exception $e) {
             $installError = $e->getMessage();
         }
