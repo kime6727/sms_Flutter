@@ -84,8 +84,10 @@ if ($path === '/install' && $method === 'GET') {
     $installed = $installer->checkDatabase($db);
     $installing = $installer->isInstalling();
 
-    // 标记文件存在但表不存在 → 自动恢复
-    if (!$installed && !$installing) {
+    // 每次访问 /install 都跑 install（依赖 Installer 幂等性：CREATE/INDEX 已存在会跳过）
+    // 第一次：建表 + 初始数据
+    // 后续：自动补字段（PART B ALTER TABLE 增量迁移）
+    if (!$installing) {
         try {
             $result = $installer->install($db);
             $installer->cleanup();
