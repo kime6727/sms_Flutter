@@ -57,8 +57,9 @@ cmds = [
 #   - 自动处理静态文件
 #   - 通过 router.php 把非静态请求路由到 index.php
 # 这样避免了 php-fpm + nginx 协调的复杂性，不再 502。
+# 端口固定 80（与 Dokploy Traefik 路由一致）。
 [phases.start]
-cmd = "php -S 0.0.0.0:${PORT:-80} -t /app /app/router.php"
+cmd = "exec php -S 0.0.0.0:80 -t /app /app/router.php"
 
 [variables]
 PORT = "80"
