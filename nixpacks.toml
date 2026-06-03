@@ -61,6 +61,10 @@ cmds = [
     "mkdir -p /var/log/php-fpm /run/php",
     "touch /var/log/php-fpm/error.log",
     "chmod 666 /var/log/php-fpm/error.log",
+    "echo '--- verify critical files ---'",
+    "ls -la /app/nginx.nixpacks.conf /app/index.php /app/router.php /app/debug.php 2>&1",
+    "echo '--- /assets/php-fpm.conf listen directive ---'",
+    "grep -E '^listen' /assets/php-fpm.conf || echo 'no listen directive in /assets/php-fpm.conf'",
     "echo '--- php version ---'",
     "php -v",
     "echo '--- php modules ---'",
@@ -71,10 +75,12 @@ cmds = [
 # 启动阶段：用我们自己的 nginx 配置（已含 try_files 路由），
 # 跳过 Nixpacks 的 prestart.mjs（它用的默认模板不路由到 index.php）
 # ====================
+# 关键点：
+#   1. 用我们自己的 nginx.nixpacks.conf（已经包含 try_files /index.php）
+#   2. 不用 prestart（默认模板不路由到 index.php）
+#   3. php-fpm 监听 127.0.0.1:9000（Nixpacks 默认值）
 [phases.start]
-cmd = """php-fpm -y /assets/php-fpm.conf 2>&1 | tee /var/log/php-fpm-runtime.log & \
-sleep 1 && \
-nginx -c /app/nginx.nixpacks.conf -g 'daemon off;' 2>&1 | tee /var/log/nginx-runtime.log"""
+cmd = "php-fpm -y /assets/php-fpm.conf >/var/log/php-fpm.log 2>&1 & sleep 2 && nginx -c /app/nginx.nixpacks.conf -g 'daemon off;'"
 
 [variables]
 PORT = "80"
