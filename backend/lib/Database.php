@@ -47,14 +47,30 @@ class Database {
                     if (!file_exists($caPath)) {
                         $pem = $caContent;
                         if (strpos($pem, '-----BEGIN') === false) {
-                            $pem = base64_decode($pem);
+                            $pem = base64_decode($caContent);
                         }
                         @file_put_contents($caPath, $pem);
                         @chmod($caPath, 0600);
                     }
                 }
 
-                // 2. SSL 标志
+                // 2. 兜底：CA 路径无效时（文件不存在或为空），自动用系统 CA bundle
+                if ($caPath && (!file_exists($caPath) || filesize($caPath) < 100)) {
+                    $systemCas = [
+                        '/etc/ssl/certs/ca-certificates.crt',  // Debian/Ubuntu
+                        '/etc/pki/tls/certs/ca-bundle.crt',    // CentOS/RHEL
+                        '/etc/ssl/cert.pem',                   // Alpine / TiDB Cloud 提示路径
+                    ];
+                    foreach ($systemCas as $cand) {
+                        if (file_exists($cand) && filesize($cand) > 100) {
+                            error_log("[DB] CA file {$caPath} missing/empty, fallback to {$cand}");
+                            $caPath = $cand;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. SSL 标志
                 if ($caPath && $verify) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $caPath;
                     if (defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
@@ -73,6 +89,12 @@ class Database {
 
             $this->pdo = new PDO($dsn, $user, $pass, $options);
         } catch (PDOException $e) {
+            // 详细错误日志（便于排查 SSL/网络问题）
+            error_log("[DB] connect failed: host={$host} port={$port} db={$db} user={$user} ssl_enabled=" . (defined('DB_SSL_ENABLED') ? 'yes' : 'no'));
+            if (defined('DB_SSL_CA')) {
+                $caFile = DB_SSL_CA;
+                error_log("[DB] SSL CA: {$caFile} (exists=" . (file_exists($caFile) ? 'yes' : 'no') . ", size=" . (file_exists($caFile) ? filesize($caFile) : 0) . ")");
+            }
             throw new Exception('数据库连接失败: ' . $e->getMessage());
         }
     }
