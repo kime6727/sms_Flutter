@@ -61,6 +61,18 @@ cmds = [
     "mkdir -p /var/log/php-fpm /run/php",
     "touch /var/log/php-fpm/error.log",
     "chmod 666 /var/log/php-fpm/error.log",
+    "echo '--- patch /assets/php-fpm.conf listen address ---'",
+    "grep -E '^listen' /assets/php-fpm.conf || echo 'no listen directive in /assets/php-fpm.conf'",
+    "echo '--- patch /assets/nginx.template.conf to route through index.php ---'",
+    "if [ -f /assets/nginx.template.conf ]; then",
+    "  # 备份并替换默认模板（默认模板不路由到 index.php 导致 /health /install 404）",
+    "  cp /assets/nginx.template.conf /assets/nginx.template.conf.bak 2>/dev/null || true",
+    "  cp /app/nginx.nixpacks.conf /assets/nginx.template.conf",
+    "  echo '--- patched nginx.template.conf ---'",
+    "  head -20 /assets/nginx.template.conf",
+    "else",
+    "  echo 'WARN: /assets/nginx.template.conf not found'",
+    "fi",
     "echo '--- verify critical files ---'",
     "ls -la /app/nginx.nixpacks.conf /app/index.php /app/router.php /app/debug.php 2>&1",
     "echo '--- /assets/php-fpm.conf listen directive ---'",
@@ -72,11 +84,11 @@ cmds = [
 ]
 
 # ====================
-# 启动阶段：替换 Nixpacks 默认的 start（不用 prestart.mjs）
-# 关键：顶层 cmd = "..." 才会真正替换默认 start 命令
-# [phases.start] 是追加，不是替换
+# 启动阶段：使用 Nixpacks 默认 start 命令
+# 默认 start 会跑 prestart.mjs 处理 /assets/nginx.template.conf
+# 我们在 build 阶段把 nginx.template.conf 替换成了我们自己的版本
+# （包含 try_files /index.php），这样 /health /install 就能正确路由
 # ====================
-cmd = "bash /app/start.sh"
 
 [variables]
 PORT = "80"
