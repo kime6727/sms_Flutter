@@ -148,11 +148,25 @@ class Installer
                 $db->query($stmt);
                 $executed++;
             } catch (Exception $e) {
-                // 部分语句（如注释性 SET）失败不算致命
+                // 多种"已存在"错误都视为可跳过（让 install 真正幂等）
                 $msg = $e->getMessage();
-                // 忽略"表已存在"错误
-                if (stripos($msg, 'already exists') !== false) {
+                $skipPatterns = [
+                    'already exists',         // CREATE TABLE / DATABASE 已存在
+                    'Duplicate key name',     // 索引/键已存在
+                    'Duplicate column name',  // 字段已存在
+                    'Duplicate entry',        // 唯一键冲突（数据已存在）
+                    'already exists',         // 大小写
+                ];
+                $shouldSkip = false;
+                foreach ($skipPatterns as $p) {
+                    if (stripos($msg, $p) !== false) {
+                        $shouldSkip = true;
+                        break;
+                    }
+                }
+                if ($shouldSkip) {
                     $skipped++;
+                    error_log("[Installer] skipped (already exists): " . substr($msg, 0, 200));
                 } else {
                     $errors[] = [
                         'index' => $idx,
