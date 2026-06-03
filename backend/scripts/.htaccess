@@ -1,0 +1,4 @@
+# 禁止 web 访问 scripts/ 目录
+# 该目录包含 setup / test / repair 等敏感脚本，仅供服务器本地 CLI 调用
+Require all denied
+Deny from all

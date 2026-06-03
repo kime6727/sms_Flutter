@@ -1,16 +1,27 @@
-# SMS接码平台 API 文档
+# SMS 接码平台 API 文档 (v1.2)
+
+> **最后更新**: 2026-06-02
+> **基线代码**: 后端 [backend/routes/](../routes/) 8 个路由文件 + Flutter [app_Flutter/lib/services/api_service.dart](../../app_Flutter/lib/services/api_service.dart)
+> **本文档已与代码实现完全对齐，废弃的端点和参数已移除**
+
+---
 
 ## 📋 目录
 
 1. [快速开始](#快速开始)
 2. [认证机制](#认证机制)
 3. [通用说明](#通用说明)
-4. [API端点](#api端点)
-   - [认证相关](#认证相关)
-   - [服务相关](#服务相关)
-   - [订单相关](#订单相关)
-   - [用户相关](#用户相关)
-   - [支付相关](#支付相关)
+4. [API 端点](#api-端点)
+   - [认证 (auth)](#认证-auth)
+   - [服务与国家 (services)](#服务与国家-services)
+   - [订单 (orders)](#订单-orders)
+   - [用户 (user)](#用户-user)
+   - [支付与充值 (payment/topup)](#支付与充值-paymenttopup)
+   - [会员 (membership)](#会员-membership)
+   - [通知 (notifications)](#通知-notifications)
+   - [横幅 (banners)](#横幅-banners)
+   - [系统 (system)](#系统-system)
+   - [Webhook](#webhook)
 5. [错误码](#错误码)
 6. [示例代码](#示例代码)
 
@@ -20,52 +31,59 @@
 
 ### 基础信息
 
-- **Base URL**: `https://smsapi2.niceapp.eu.cc/api`
-- **API版本**: v1.0
-- **数据格式**: JSON
-- **字符编码**: UTF-8
+- **Base URL**: `https://<your-domain>/api`
+- **API 版本**: v1.2
+- **数据格式**: JSON (UTF-8)
+- **限流**: 默认 60 次/分钟/IP
 
 ### 快速测试
 
 ```bash
 # 健康检查
-curl https://smsapi2.niceapp.eu.cc/api/health
+curl https://<your-domain>/api/system/health
 
-# 设备注册
-curl -X POST https://smsapi2.niceapp.eu.cc/api/auth/register \
+# 邮箱注册（自动生成用户名/密码）
+curl -X POST https://<your-domain>/api/auth/manual-register \
   -H "Content-Type: application/json" \
-  -d '{"device_id":"test_device_123"}'
+  -H "X-Device-Id: test_device_001" \
+  -d '{"email":"user@example.com","password":"MyStr0ng!Pass"}'
 ```
 
 ---
 
 ## 认证机制
 
-### API Key 认证
+### 1. API Key 认证
 
-大部分API需要在请求头中携带API Key：
-
+所有非公开端点需在请求头携带：
 ```
-X-API-Key: 606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077
-```
-
-### Token 认证
-
-用户相关操作需要Bearer Token：
-
-```
-Authorization: Bearer {token}
+X-API-Key: <your_api_key>
 ```
 
-### 公开端点
+### 2. Token 认证
 
-以下端点无需API Key：
-- `/health` - 健康检查
-- `/auth/register` - 设备注册
-- `/auth/login` - 用户登录
-- `/auth/password-login` - 密码登录
-- `/auth/manual-register` - 邮箱注册
-- `/verify-receipt` - 支付验证
+用户私有接口额外需要：
+```
+Authorization: Bearer <token>
+```
+
+Token 有效期 30 天，HMAC-SHA256 签名，存于 `users.auth_token` 字段。
+
+### 3. 公开端点（无需 API Key / Token）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/system/health` | GET | 健康检查 |
+| `/system/settings` | GET | 全局系统设置（公开部分）|
+| `/banners` | GET | 横幅列表 |
+| `/auth/manual-register` | POST | 邮箱一键注册 |
+| `/auth/forgot-password` | POST | 忘记密码（生成新密码）|
+| `/auth/password-login` | POST | 邮箱密码登录 |
+| `/service-countries/published` | GET | 服务-国家组合 |
+| `/points/packages` | GET | 积分套餐 |
+| `/topup-packages` | GET | 充值套餐 |
+| `/membership/levels` | GET | 会员等级列表 |
+| `/coefficients/active` | GET | 当前生效系数 |
 
 ---
 
@@ -75,192 +93,213 @@ Authorization: Bearer {token}
 
 ```http
 Content-Type: application/json
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}  # 需要认证的接口
+X-API-Key: <your_api_key>
+X-Device-Id: <device_uuid>     # 部分接口必填
+Authorization: Bearer <token>  # 用户私有接口必填
 ```
 
 ### 响应格式
 
-#### 成功响应
-
+**成功**:
 ```json
 {
   "success": true,
-  "message": "操作成功",
-  "data": {
-    // 响应数据
-  }
+  "data": { ... }
 }
 ```
 
-#### 错误响应
-
+**失败**:
 ```json
 {
   "success": false,
   "error": "错误信息",
-  "code": "error_code"  // 可选
+  "code": "error_code"
 }
 ```
 
-### HTTP状态码
+### HTTP 状态码
 
-- `200` - 成功
-- `400` - 请求参数错误
-- `401` - 未授权
-- `404` - 资源不存在
-- `409` - 冲突（如邮箱已存在）
-- `500` - 服务器错误
+| 状态码 | 含义 |
+|--------|------|
+| 200 | 成功 |
+| 400 | 请求参数错误 |
+| 401 | 未授权（Token 无效/过期）|
+| 403 | 禁止访问 |
+| 404 | 资源不存在 |
+| 409 | 冲突（如邮箱已注册）|
+| 429 | 触发限流 |
+| 500 | 服务器错误 |
+| 503 | 上游服务不可用（HeroSMS 余额不足等）|
 
 ---
 
-## API端点
+## API 端点
 
-### 认证相关
+### 认证 (auth)
 
-#### 1. 设备注册/登录
+> 实现位置: [routes/auth.php](../routes/auth.php) + [routes/payment.php](../routes/payment.php) (manual-register 别名)
 
-自动注册或登录设备，返回用户信息和Token。
-
-**端点**: `POST /auth/register`
-
-**请求参数**:
-```json
-{
-  "device_id": "string"  // 必填，设备唯一标识
-}
-```
-
-**响应示例**:
-```json
-{
-  "success": true,
-  "user": {
-    "id": "user_f021264f3a5e6c99",
-    "username": "user_644186",
-    "balance": 5,
-    "total_spent": 0,
-    "order_count": 0,
-    "created_at": "2026-05-12 15:25:02"
-  },
-  "token": "dXNlcl81NzQwODM4ZDU0ZDkzNDI2...",
-  "credentials": {
-    "username": "user_644186",
-    "password": "B5zh2493",
-    "show_once": true
-  },
-  "bonus_credits": 5,
-  "message": "请保存您的账号密码，这是唯一一次显示密码的机会"
-}
-```
-
-**说明**:
-- 首次注册会生成随机用户名和密码
-- 赠送5-20积分（可配置）
-- 密码仅显示一次，请妥善保管
-- 已注册设备直接返回登录信息
-
----
-
-#### 2. 邮箱注册
-
-使用邮箱和密码注册新账号。
-
-**端点**: `POST /auth/manual-register`
-
-**请求参数**:
-```json
-{
-  "email": "user@example.com",  // 必填
-  "password": "password123",     // 必填，至少6位
-  "device_id": "device_123"      // 可选
-}
-```
-
-**响应示例**:
-```json
-{
-  "success": true,
-  "user": {
-    "id": "user_abc123",
-    "username": "user_123456",
-    "email": "user@example.com",
-    "balance": 10,
-    "created_at": "2026-05-12 16:00:00"
-  },
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "bonus_credits": 10
-}
-```
-
-**错误码**:
-- `email_exists` - 邮箱已被使用
-- `invalid_email` - 邮箱格式无效
-- `password_too_short` - 密码少于6位
-
----
-
-#### 3. 密码登录
-
-使用邮箱和密码登录。
+#### 1. 邮箱密码登录
 
 **端点**: `POST /auth/password-login`
 
-**请求参数**:
+**请求**:
 ```json
 {
-  "email": "user@example.com",
-  "password": "password123"
+  "login": "user@example.com",  // 邮箱
+  "password": "MyStr0ng!Pass"
 }
 ```
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
   "user": {
-    "id": "user_abc123",
-    "username": "user_123456",
+    "id": "uuid",
+    "username": "user_xxx",
     "email": "user@example.com",
-    "balance": 100,
-    "total_spent": 50,
-    "order_count": 5
+    "balance": 10,
+    "total_spent": 0,
+    "order_count": 0,
+    "is_new_device": true,
+    "membership": { ... },
+    "next_level": { ... },
+    "progress": { ... },
+    "all_levels": [...]
   },
-  "token": "eyJhbGciOiJIUzI1NiIs..."
+  "token": "base64-encoded-hmac-token"
 }
 ```
 
 ---
 
-### 服务相关
+#### 2. 邮箱一键注册（推荐）
 
-#### 4. 获取已发布的服务国家
+**端点**: `POST /auth/manual-register`
 
-获取所有已发布的服务-国家组合列表。
+**请求**:
+```json
+{
+  "email": "user@example.com",         // 必填
+  "password": "MyStr0ng!Pass",          // 必填, ≥8 位
+  "device_id": "device_uuid_xxx"        // 可选, 不传则自动生成
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "credentials": {
+    "username": "user_abc123",         // ⚠️ 仅返回一次,请提示用户保存
+    "password": "随机密码",
+    "email": "user@example.com"
+  },
+  "user": {
+    "id": "uuid",
+    "username": "user_abc123",
+    "email": "user@example.com",
+    "nickname": "user_abc123",
+    "balance": 10,
+    "is_new_device": true
+  },
+  "token": "..."
+}
+```
+
+**错误码**: `email_exists` / `invalid_email` / `password_too_short` (<8)
+
+---
+
+#### 3. 忘记密码
+
+**端点**: `POST /auth/forgot-password`
+
+**请求**:
+```json
+{ "email": "user@example.com" }
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "new_password": "随机8位密码",  // ⚠️ 后端生成,前端必须直接展示给用户
+  "message": "新密码已生成,请妥善保管"
+}
+```
+
+**安全说明**:
+- 新密码同时通过邮件发送
+- 该接口已废弃 `reset_token` 机制,无需先获取 token 再 reset,简化为"邮箱 → 新密码"
+- ⚠️ 已注册邮箱会返回 `new_password`,未注册邮箱返回 `success: true` 但无 `new_password`(防枚举)
+
+---
+
+#### 4. 修改密码（登录后）
+
+**端点**: `POST /auth/change-password`
+
+**请求**:
+```json
+{
+  "old_password": "原密码",
+  "new_password": "新密码 (≥8 位)"
+}
+```
+
+**响应**: `{ "success": true, "message": "密码已更新" }`
+
+**错误码**: `wrong_password` / `password_too_short`
+
+---
+
+#### 5. 校验旧密码
+
+**端点**: `POST /auth/verify-password`
+
+**请求**:
+```json
+{ "password": "当前密码" }
+```
+
+**响应**: `{ "success": true, "valid": true }`
+
+---
+
+### 服务与国家 (services)
+
+> 实现位置: [routes/services.php](../routes/services.php)
+
+#### 6. 获取已发布的服务-国家组合
 
 **端点**: `GET /service-countries/published`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-```
+**查询参数**:
+- `lang`: `zh` / `en`(默认 `zh`)
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
   "data": [
     {
-      "id": 129,
-      "service_id": 105,
-      "country_id": 129,
-      "name": "佐治亞州",
-      "name_en": "Georgia",
-      "flag": "https://cdn.hero-sms.com/assets/img/country/128.svg",
-      "code": "",
-      "phone_code": "269",
-      "price": 0.01,
-      "is_auto": 0,
+      "id": 1,
+      "service_id": 1,
+      "country_id": 6,
+      "service_name": "WhatsApp",
+      "service_name_en": "WhatsApp",
+      "service_icon": "https://<host>/pic/fuwu/wa.png",
+      "country_name": "印度尼西亚",
+      "country_name_en": "Indonesia",
+      "country_code": "ID",
+      "country_flag": "https://<host>/pic/country/id.svg",
+      "phone_code": "+62",
+      "price": 0.5,
+      "price_points": 100,        // 实际扣的积分(已算系数)
+      "available": 1500,          // 当前库存
+      "is_auto": 1,
       "active": 1,
       "is_published": 1
     }
@@ -268,25 +307,20 @@ X-API-Key: {your_api_key}
 }
 ```
 
-**说明**:
-- 返回所有已发布的服务-国家组合
-- 客户端可根据service_id或country_id筛选
-- price为积分价格
+**价格计算公式**:
+```
+points = cost_usd × 100 × coefficient × (1 - membership_discount)
+- coefficient 来自 system_settings(默认 4.0/4.5)
+- discount 来自 membership_levels(默认 0)
+```
 
 ---
 
-#### 5. 获取服务列表
-
-获取所有可用服务。
+#### 7. 获取服务列表
 
 **端点**: `GET /services`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-```
-
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
@@ -294,11 +328,11 @@ X-API-Key: {your_api_key}
     {
       "id": 1,
       "name": "WhatsApp",
+      "name_en": "WhatsApp",
       "name_cn": "WhatsApp",
       "code": "wa",
-      "icon": "https://example.com/whatsapp.png",
-      "description": "WhatsApp验证码接收",
-      "is_active": 1
+      "icon": "https://...wa.png",
+      "is_published": 1
     }
   ]
 }
@@ -306,33 +340,24 @@ X-API-Key: {your_api_key}
 
 ---
 
-#### 6. 获取国家列表
+#### 8. 获取国家列表
 
-获取指定服务的可用国家。
+**端点**: `GET /countries?service_id=1`
 
-**端点**: `GET /countries?service_id={service_id}`
-
-**请求头**:
-```
-X-API-Key: {your_api_key}
-```
-
-**查询参数**:
-- `service_id` (必填): 服务ID
-
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
   "data": [
     {
-      "id": 1,
-      "name": "美国",
-      "name_en": "United States",
-      "code": "US",
-      "phone_code": "1",
-      "flag": "https://example.com/us.svg",
-      "price": 10
+      "id": 6,
+      "name": "印度尼西亚",
+      "name_en": "Indonesia",
+      "name_cn": "印度尼西亚",
+      "code": "ID",
+      "phone_code": "+62",
+      "flag": "https://...id.svg",
+      "hero_country_id": "6"
     }
   ]
 }
@@ -340,164 +365,127 @@ X-API-Key: {your_api_key}
 
 ---
 
-### 订单相关
+### 订单 (orders)
 
-#### 7. 创建订单
+> 实现位置: [routes/orders.php](../routes/orders.php)
+> 状态机: `pending` → `active` → `completed | expired | cancelled`
 
-创建新的接码订单。
+#### 9. 创建订单
 
 **端点**: `POST /orders`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
-
-**请求参数**:
+**请求**:
 ```json
 {
-  "service_id": 1,   // 必填
-  "country_id": 1    // 必填
+  "service_id": 1,
+  "country_id": 6,
+  "quantity": 1              // 可选, 默认 1
 }
 ```
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "id": "order_abc123",
-    "user_id": "user_xyz789",
+  "order": {
+    "id": "uuid",
+    "user_id": "uuid",
     "service_id": 1,
-    "country_id": 1,
+    "country_id": 6,
     "service_name": "WhatsApp",
-    "country_name": "美国",
+    "country_name": "印度尼西亚",
     "status": "pending",
-    "total_price": 10,
-    "created_at": "2026-05-12 16:00:00",
-    "expires_at": "2026-05-13 16:00:00"
+    "total_cost": 100,        // 实际扣的积分
+    "price_points": 100,
+    "expires_at": "2026-06-03 16:00:00",  // 24h 后过期
+    "created_at": "2026-06-02 16:00:00"
   }
 }
 ```
 
-**订单状态**:
-- `pending` - 待激活（24小时有效期）
-- `active` - 进行中（20分钟超时）
-- `completed` - 已完成
-- `expired` - 已过期
-- `cancelled` - 已取消
-
-**错误码**:
-- `insufficient_balance` - 积分不足
-- `service_not_found` - 服务不存在
-- `country_not_found` - 国家不存在
+**错误码**: `insufficient_balance` / `service_not_found` / `country_not_found` / `service_country_not_published`
 
 ---
 
-#### 8. 激活订单
-
-激活pending状态的订单，从HeroSMS获取真实号码。
+#### 10. 激活订单（拉真实号码）
 
 **端点**: `POST /orders/{order_id}/activate`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
+**说明**:
+- 调 HeroSMS 第三方 API 拿真号码
+- 调 HeroSMS `setStatus(1)` 通知开始等短信
+- 激活失败自动退款
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "id": "order_abc123",
+  "order": {
+    "id": "uuid",
     "status": "active",
-    "phone_number": "+12345678901",
-    "expires_at": "2026-05-12 16:20:00",
-    "hero_order_id": "12345678"
+    "phone_number": "+628123456789",
+    "hero_order_id": "234242",
+    "expires_at": "2026-06-02 16:20:00"  // 20 分钟
   }
 }
 ```
 
-**说明**:
-- 激活后有20分钟时间接收短信
-- 超时未收到短信订单自动完成（不退款）
-- 返回的手机号码用于注册目标平台
+**错误码**: `order_not_pending` / `order_expired` / `no_available_numbers` / `insufficient_hero_balance` / `hero_api_error`
 
 ---
 
-#### 9. 获取订单详情
-
-获取指定订单的详细信息。
+#### 11. 获取订单详情
 
 **端点**: `GET /orders/{order_id}`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
-
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "id": "order_abc123",
-    "user_id": "user_xyz789",
+  "order": {
+    "id": "uuid",
+    "user_id": "uuid",
     "service_id": 1,
-    "country_id": 1,
+    "country_id": 6,
     "service_name": "WhatsApp",
-    "country_name": "美国",
-    "phone_number": "+12345678901",
+    "service_name_en": "WhatsApp",
+    "service_icon": "https://...wa.png",
+    "country_name": "印度尼西亚",
+    "country_name_en": "Indonesia",
+    "country_code": "ID",
+    "country_flag": "https://...id.svg",
     "status": "completed",
-    "sms_code": "123456",
-    "total_price": 10,
-    "created_at": "2026-05-12 16:00:00",
-    "activated_at": "2026-05-12 16:01:00",
-    "completed_at": "2026-05-12 16:05:00",
-    "expires_at": "2026-05-12 16:21:00"
+    "phone_number": "+628123456789",
+    "sms_code": "123456",           // ⚠️ 仅从 sms_messages 关联查询
+    "sms_received_at": "2026-06-02 16:05:00",
+    "sms_content": "Your code is 123456",
+    "total_cost": 100,
+    "price_points": 100,
+    "hero_order_id": "234242",
+    "expires_at": "2026-06-02 16:20:00",
+    "activated_at": "2026-06-02 16:00:30",
+    "completed_at": "2026-06-02 16:05:00",
+    "created_at": "2026-06-02 16:00:00"
   }
 }
 ```
 
 ---
 
-#### 10. 获取订单列表
-
-获取当前用户的订单列表。
+#### 12. 获取订单列表
 
 **端点**: `GET /orders`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
-
 **查询参数**:
-- `status` (可选): 筛选状态 (pending/active/completed/expired/cancelled)
-- `page` (可选): 页码，默认1
-- `limit` (可选): 每页数量，默认20
+- `status`: `pending` / `active` / `completed` / `expired` / `cancelled`
+- `page`: 页码(默认 1)
+- `limit`: 每页数量(默认 20, 最大 100)
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": "order_abc123",
-      "service_name": "WhatsApp",
-      "country_name": "美国",
-      "phone_number": "+12345678901",
-      "status": "completed",
-      "sms_code": "123456",
-      "total_price": 10,
-      "created_at": "2026-05-12 16:00:00"
-    }
-  ],
+  "orders": [ { ... 同 11 字段 ... } ],
   "pagination": {
     "current_page": 1,
     "total_pages": 5,
@@ -509,160 +497,183 @@ Authorization: Bearer {token}
 
 ---
 
-#### 11. 取消订单
-
-取消pending状态的订单，退还积分。
+#### 13. 取消订单
 
 **端点**: `POST /orders/{order_id}/cancel`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
+**说明**: 仅 pending 状态可取消,自动退款写 `credit_transactions`
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "id": "order_abc123",
-    "status": "cancelled",
-    "refund_amount": 10
-  }
+  "order": { "id": "uuid", "status": "cancelled" },
+  "refund_amount": 100
 }
 ```
 
-**说明**:
-- 仅pending状态且未过期的订单可取消
-- 取消后积分退还到账户
-- active/completed状态订单不可取消
+**错误码**: `cannot_cancel` (active/completed 不可取消)
 
 ---
 
-#### 12. 获取短信验证码
+#### 14. 请求重发 SMS
 
-主动获取订单的短信验证码。
+**端点**: `POST /orders/{order_id}/request-resend`
 
-**端点**: `GET /orders/{order_id}/sms`
+**说明**: 调 HeroSMS `setStatus(3)`,免费重发一次
 
-**请求头**:
+**响应**: `{ "success": true, "message": "已请求重发,请等待新短信" }`
+
+---
+
+#### 15. 批量创建订单
+
+**端点**: `POST /orders/batch`
+
+**请求**:
+```json
+{
+  "service_id": 1,
+  "country_id": 6,
+  "quantity": 5        // 1-10
+}
 ```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
 
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "code": "123456",
-    "received_at": "2026-05-12 16:05:00",
-    "message": "Your verification code is: 123456"
-  }
+  "count": 5,
+  "total_cost": 500,
+  "orders": [ ... ]
 }
 ```
 
 ---
 
-### 用户相关
+#### 16. 查询库存
 
-#### 13. 获取用户信息
+**端点**: `GET /orders/stock?service_id=1&country_id=6`
 
-获取当前用户的个人信息。
+**响应**:
+```json
+{ "success": true, "available": 1500 }
+```
+
+---
+
+### 用户 (user)
+
+> 实现位置: [routes/user.php](../routes/user.php)
+
+#### 17. 获取用户信息
 
 **端点**: `GET /user/profile`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
-
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "id": "user_abc123",
-    "username": "user_123456",
+  "user": {
+    "id": "uuid",
+    "username": "user_xxx",
     "email": "user@example.com",
     "balance": 100,
-    "total_spent": 50,
+    "total_spent": 50.00,        // decimal
     "order_count": 5,
-    "created_at": "2026-05-01 10:00:00",
-    "last_login": "2026-05-12 16:00:00",
     "has_topup_history": true,
-    "first_topup_countdown_hours": 0
+    "first_topup_countdown_hours": 18,  // >0 表示首充双倍仍生效
+    "membership": {
+      "level": "silver",
+      "level_cn": "银卡",
+      "min_spent": 100.00,
+      "discount": 0.95,
+      "icon": "https://...silver.png",
+      "color": "#C0C0C0"
+    },
+    "next_level": {
+      "level": "gold",
+      "level_cn": "金卡",
+      "min_spent": 500.00,
+      "discount": 0.90
+    },
+    "progress": {
+      "current": 50.00,
+      "needed": 500.00,
+      "percentage": 0
+    },
+    "all_levels": [...]
   }
 }
 ```
 
 ---
 
-#### 14. 获取积分余额
+#### 18. 更新用户资料
 
-获取用户当前积分余额和交易记录。
+**端点**: `PUT /user/profile`
 
-**端点**: `GET /user/balance`
-
-**请求头**:
+**请求**:
+```json
+{
+  "nickname": "新昵称",
+  "email": "new@example.com",
+  "old_password": "原密码",   // 改密时必填
+  "new_password": "新密码",   // 改密时必填
+  "set_password": "新密码"    // 未设过密码时直接设
+}
 ```
-X-API-Key: {your_api_key}
-Authorization: Bearer {token}
-```
 
-**响应示例**:
+---
+
+#### 19. 获取积分余额与流水
+
+**端点**: `GET /user/balance?limit=20`
+
+**响应**:
 ```json
 {
   "success": true,
-  "data": {
-    "balance": 100,
-    "transactions": [
-      {
-        "id": "txn_abc123",
-        "type": "topup",
-        "amount": 100,
-        "balance_after": 100,
-        "description": "充值",
-        "created_at": "2026-05-12 16:00:00"
-      },
-      {
-        "id": "txn_def456",
-        "type": "purchase",
-        "amount": -10,
-        "balance_after": 90,
-        "description": "购买WhatsApp号码",
-        "created_at": "2026-05-12 16:05:00"
-      }
-    ]
-  }
+  "balance": 100,
+  "transactions": [
+    {
+      "id": "txn_uuid",
+      "type": "topup",
+      "amount": 100,
+      "balance_after": 100,
+      "description": "充值",
+      "created_at": "2026-06-02 16:00:00"
+    }
+  ]
 }
 ```
 
-**交易类型**:
-- `topup` - 充值
-- `purchase` - 购买
-- `refund` - 退款
-- `bonus` - 赠送
+---
+
+#### 20. 设备注册/绑定
+
+**端点**: `POST /devices/register`
+
+**请求**:
+```json
+{
+  "device_id": "device_uuid",
+  "platform": "ios",
+  "device_model": "iPhone 15"
+}
+```
 
 ---
 
-### 支付相关
+### 支付与充值 (payment/topup)
 
-#### 15. 获取充值套餐
+> 实现位置: [routes/payment.php](../routes/payment.php) + [routes/topup.php](../routes/topup.php)
 
-获取所有可用的充值套餐。
+#### 21. 获取积分套餐（IAP 套餐）
 
 **端点**: `GET /points/packages`
 
-**请求头**:
-```
-X-API-Key: {your_api_key}
-```
-
-**响应示例**:
+**响应**:
 ```json
 {
   "success": true,
@@ -675,19 +686,9 @@ X-API-Key: {your_api_key}
       "points": 100,
       "price": 0.99,
       "display_price": 0.99,
-      "description": "适合偶尔使用",
-      "is_recommended": false
-    },
-    {
-      "id": "pkg_medium",
-      "product_id": "com.sms.credits.500",
-      "name": "标准充值",
-      "credits": 500,
-      "points": 500,
-      "price": 4.99,
-      "display_price": 4.99,
-      "description": "最受欢迎",
-      "is_recommended": true
+      "currency": "USD",
+      "is_recommended": false,
+      "is_first_topup_bonus": true  // 首充双倍时返 true
     }
   ]
 }
@@ -695,287 +696,391 @@ X-API-Key: {your_api_key}
 
 ---
 
-#### 16. 验证支付收据
+#### 22. 获取充值套餐
 
-验证Apple IAP支付收据并充值积分。
+**端点**: `GET /topup-packages`
 
-**端点**: `POST /verify-receipt`
-
-**请求参数**:
+**响应**:
 ```json
 {
-  "receipt_data": "base64_encoded_receipt",
-  "product_id": "com.sms.credits.100",
-  "transaction_id": "1000000123456789"
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "标准充值",
+      "credits": 500,
+      "original_price": 4.99,
+      "sale_price": 3.99,
+      "bonus_credits": 50,
+      "is_popular": true
+    }
+  ]
 }
 ```
 
-**响应示例**:
+---
+
+#### 23. 创建支付订单
+
+**端点**: `POST /payment/create`
+
+**请求**:
+```json
+{
+  "package_id": "pkg_medium",
+  "payment_method": "apple_iap"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "order_id": "topup_uuid",
+  "product_id": "com.sms.credits.500"
+}
+```
+
+---
+
+#### 24. 验证 Apple IAP 收据
+
+**端点**: `POST /topup/verify-apple`
+
+**请求**:
+```json
+{
+  "receipt_data": "base64_encoded_receipt",
+  "product_id": "com.sms.credits.500",
+  "transaction_id": "1000000123456789",
+  "order_id": "topup_uuid"
+}
+```
+
+**响应**:
+```json
+{
+  "success": true,
+  "credits_added": 500,
+  "new_balance": 600,
+  "is_first_topup": false,
+  "transaction_id": "txn_uuid"
+}
+```
+
+---
+
+#### 25. 获取首充奖励状态
+
+**端点**: `GET /user/first-topup-status`
+
+**响应**:
+```json
+{
+  "success": true,
+  "is_first_topup": true,
+  "countdown_hours": 18,
+  "bonus_multiplier": 2
+}
+```
+
+---
+
+### 会员 (membership)
+
+> 实现位置: [routes/payment.php](../routes/payment.php)
+
+#### 26. 获取会员等级列表
+
+**端点**: `GET /membership/levels`
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    { "level": "bronze", "level_cn": "铜卡", "min_spent": 0,    "discount": 1.0 },
+    { "level": "silver", "level_cn": "银卡", "min_spent": 100,  "discount": 0.95 },
+    { "level": "gold",   "level_cn": "金卡", "min_spent": 500,  "discount": 0.9 },
+    { "level": "diamond","level_cn": "钻石", "min_spent": 2000, "discount": 0.85 }
+  ]
+}
+```
+
+---
+
+### 通知 (notifications)
+
+> 实现位置: [routes/notifications.php](../routes/notifications.php)
+
+#### 27. 获取通知列表
+
+**端点**: `GET /notifications?status=unread&page=1&limit=20`
+
+**响应**:
+```json
+{
+  "success": true,
+  "notifications": [
+    {
+      "id": "notif_uuid",
+      "type": "sms_received",
+      "title": "验证码已收到",
+      "body": "您的验证码: 123456",
+      "data": { "order_id": "...", "sms_code": "123456" },
+      "related_order_id": "order_uuid",
+      "status": "unread",
+      "read_at": null,
+      "created_at": "2026-06-02 16:05:00"
+    }
+  ],
+  "unread_count": 3
+}
+```
+
+---
+
+#### 28. 标记已读
+
+**端点**: `POST /notifications/{id}/read`
+
+---
+
+#### 29. 全部标记已读
+
+**端点**: `POST /notifications/mark-all-read`
+
+---
+
+### 横幅 (banners)
+
+> 实现位置: [routes/payment.php](../routes/payment.php)
+
+#### 30. 获取首页横幅
+
+**端点**: `GET /banners`
+
+**响应**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "首充双倍积分",
+      "subtitle": "新用户首充 2 倍积分",
+      "image_url": "https://...banner.png",
+      "link_type": "topup",  // / web / service
+      "link_value": "topup",
+      "sort_order": 1,
+      "is_active": true
+    }
+  ]
+}
+```
+
+---
+
+### 系统 (system)
+
+> 实现位置: [routes/system.php](../routes/system.php)
+
+#### 31. 健康检查
+
+**端点**: `GET /system/health`
+
+**响应**:
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-06-02 16:00:00",
+  "db": "ok",
+  "hero_sms": "configured"
+}
+```
+
+---
+
+#### 32. 全局系统设置
+
+**端点**: `GET /system/settings`
+
+**响应**:
 ```json
 {
   "success": true,
   "data": {
-    "credits_added": 100,
-    "new_balance": 200,
-    "transaction_id": "txn_abc123"
+    "app_name": "Simu SMS",
+    "support_email": "support@smsapi2.niceapp.eu.cc",
+    "min_topup": 1,
+    "max_topup": 10000,
+    "default_coefficient_before": 4.0,
+    "default_coefficient_after": 4.5,
+    "register_bonus_min": 5,
+    "register_bonus_max": 20,
+    "first_topup_countdown_hours": 24,
+    "active_order_timeout_minutes": 20
   }
 }
 ```
 
 ---
 
-### 系统相关
+#### 33. 当前生效价格系数
 
-#### 17. 健康检查
+**端点**: `GET /coefficients/active`
 
-检查API服务状态。
+---
 
-**端点**: `GET /health`
+### Webhook
 
-**响应示例**:
-```json
-{
-  "status": "ok",
-  "timestamp": "2026-05-12 16:00:00"
-}
+> 实现位置: [backend/webhook.php](../../backend/webhook.php) — 通过 [router.php](../../backend/router.php#L26) 转发 `/webhook/*`
+
+#### 34. HeroSMS 短信到达回调
+
+**端点**: `POST /webhook/hero-sms` (注册到 HeroSMS 后台)
+
+**请求** (POST, application/x-www-form-urlencoded):
 ```
+id=234242&number=79991728822&sms=Your+code+is+12345&code=12345&country=0
+```
+
+**处理**:
+1. 写 `sms_messages` 表
+2. 更新 `orders.status = 'completed'`
+3. 写 `notifications` 表(关联 `related_order_id`)
+
+**响应**: `200 OK { "success": true }`
 
 ---
 
 ## 错误码
 
-### 通用错误码
+### 通用
 
-| 错误码 | 说明 | HTTP状态码 |
-|--------|------|-----------|
-| `invalid_api_key` | API Key无效 | 401 |
+| 错误码 | 含义 | HTTP |
+|--------|------|------|
+| `invalid_api_key` | API Key 无效 | 401 |
 | `unauthorized` | 未授权 | 401 |
-| `invalid_token` | Token无效 | 401 |
-| `token_expired` | Token已过期 | 401 |
-| `resource_not_found` | 资源不存在 | 404 |
+| `invalid_token` | Token 无效 | 401 |
+| `token_expired` | Token 已过期 | 401 |
+| `forbidden` | 禁止访问 | 403 |
+| `not_found` | 资源不存在 | 404 |
+| `rate_limit` | 触发限流 | 429 |
 | `server_error` | 服务器错误 | 500 |
 
-### 认证错误码
+### 认证
 
-| 错误码 | 说明 | HTTP状态码 |
-|--------|------|-----------|
-| `email_exists` | 邮箱已被使用 | 409 |
+| 错误码 | 含义 | HTTP |
+|--------|------|------|
+| `email_exists` | 邮箱已注册 | 409 |
 | `invalid_email` | 邮箱格式无效 | 400 |
-| `password_too_short` | 密码少于6位 | 400 |
-| `invalid_credentials` | 用户名或密码错误 | 401 |
-| `device_exists` | 设备已注册 | 409 |
+| `password_too_short` | 密码少于 8 位 | 400 |
+| `wrong_password` | 密码错误 | 401 |
+| `invalid_credentials` | 用户名/密码错误 | 401 |
+| `email_not_registered` | 邮箱未注册 | 404 |
 
-### 订单错误码
+### 订单
 
-| 错误码 | 说明 | HTTP状态码 |
-|--------|------|-----------|
+| 错误码 | 含义 | HTTP |
+|--------|------|------|
 | `insufficient_balance` | 积分不足 | 400 |
 | `order_not_found` | 订单不存在 | 404 |
+| `order_not_pending` | 订单非 pending 状态 | 400 |
 | `order_expired` | 订单已过期 | 400 |
-| `order_already_activated` | 订单已激活 | 400 |
 | `cannot_cancel` | 订单不可取消 | 400 |
 | `service_not_found` | 服务不存在 | 404 |
 | `country_not_found` | 国家不存在 | 404 |
-| `no_available_numbers` | 暂无可用号码 | 400 |
+| `service_country_not_published` | 服务-国家组合未发布 | 400 |
+| `no_available_numbers` | 暂无可用号码 | 503 |
+| `insufficient_hero_balance` | HeroSMS 余额不足 | 503 |
+| `hero_api_error` | HeroSMS API 错误 | 503 |
+| `quantity_invalid` | 数量超出范围 1-10 | 400 |
+
+### 支付
+
+| 错误码 | 含义 | HTTP |
+|--------|------|------|
+| `package_not_found` | 套餐不存在 | 404 |
+| `invalid_receipt` | Apple 收据无效 | 400 |
+| `product_mismatch` | 产品 ID 不匹配 | 400 |
+| `duplicate_transaction` | 重复交易 | 409 |
 
 ---
 
 ## 示例代码
 
-### JavaScript/TypeScript
+### Flutter (官方客户端)
 
-```typescript
-// 配置
-const API_BASE_URL = 'https://smsapi2.niceapp.eu.cc/api';
-const API_KEY = 'your_api_key_here';
+参考 [app_Flutter/lib/services/api_service.dart](../../app_Flutter/lib/services/api_service.dart) 实现。
 
-// 设备注册
-async function registerDevice(deviceId: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ device_id: deviceId }),
-  });
-  return await response.json();
-}
+### 关键流程示例
 
-// 获取服务列表
-async function getServices(token: string) {
-  const response = await fetch(`${API_BASE_URL}/service-countries/published`, {
-    headers: {
-      'X-API-Key': API_KEY,
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  return await response.json();
-}
-
-// 创建订单
-async function createOrder(token: string, serviceId: number, countryId: number) {
-  const response = await fetch(`${API_BASE_URL}/orders`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': API_KEY,
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      service_id: serviceId,
-      country_id: countryId,
-    }),
-  });
-  return await response.json();
-}
-
-// 激活订单
-async function activateOrder(token: string, orderId: string) {
-  const response = await fetch(`${API_BASE_URL}/orders/${orderId}/activate`, {
-    method: 'POST',
-    headers: {
-      'X-API-Key': API_KEY,
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  return await response.json();
-}
-
-// 获取订单详情
-async function getOrderDetail(token: string, orderId: string) {
-  const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
-    headers: {
-      'X-API-Key': API_KEY,
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  return await response.json();
-}
-```
-
-### Python
-
-```python
-import requests
-
-# 配置
-API_BASE_URL = 'https://smsapi2.niceapp.eu.cc/api'
-API_KEY = 'your_api_key_here'
-
-# 设备注册
-def register_device(device_id):
-    response = requests.post(
-        f'{API_BASE_URL}/auth/register',
-        json={'device_id': device_id}
-    )
-    return response.json()
-
-# 获取服务列表
-def get_services(token):
-    response = requests.get(
-        f'{API_BASE_URL}/service-countries/published',
-        headers={
-            'X-API-Key': API_KEY,
-            'Authorization': f'Bearer {token}'
-        }
-    )
-    return response.json()
-
-# 创建订单
-def create_order(token, service_id, country_id):
-    response = requests.post(
-        f'{API_BASE_URL}/orders',
-        headers={
-            'Content-Type': 'application/json',
-            'X-API-Key': API_KEY,
-            'Authorization': f'Bearer {token}'
-        },
-        json={
-            'service_id': service_id,
-            'country_id': country_id
-        }
-    )
-    return response.json()
-
-# 激活订单
-def activate_order(token, order_id):
-    response = requests.post(
-        f'{API_BASE_URL}/orders/{order_id}/activate',
-        headers={
-            'X-API-Key': API_KEY,
-            'Authorization': f'Bearer {token}'
-        }
-    )
-    return response.json()
-```
-
-### Dart/Flutter
+#### 完整下单收码
 
 ```dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// 1. 登录
+final loginResp = await apiService.login(
+  login: 'user@example.com',
+  password: 'MyStr0ng!Pass',
+);
+final token = loginResp['token'];
 
-class SmsApiClient {
-  static const String baseUrl = 'https://smsapi2.niceapp.eu.cc/api';
-  static const String apiKey = 'your_api_key_here';
-  
-  // 设备注册
-  static Future<Map<String, dynamic>> registerDevice(String deviceId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/register'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'device_id': deviceId}),
-    );
-    return jsonDecode(response.body);
+// 2. 加载服务
+final services = await apiService.get('/service-countries/published');
+
+// 3. 创建订单
+final orderResp = await apiService.post('/orders', body: {
+  'service_id': 1,
+  'country_id': 6,
+});
+final orderId = orderResp['order']['id'];
+
+// 4. 激活
+final activateResp = await apiService.post('/orders/$orderId/activate');
+final phone = activateResp['order']['phone_number'];
+
+// 5. 轮询等短信(每 5 秒)
+Timer.periodic(Duration(seconds: 5), (timer) async {
+  final detail = await apiService.get('/orders/$orderId');
+  final smsCode = detail['order']['sms_code'];
+  if (smsCode != null) {
+    timer.cancel();
+    print('收到验证码: $smsCode');
   }
-  
-  // 获取服务列表
-  static Future<Map<String, dynamic>> getServices(String token) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/service-countries/published'),
-      headers: {
-        'X-API-Key': apiKey,
-        'Authorization': 'Bearer $token',
-      },
-    );
-    return jsonDecode(response.body);
-  }
-  
-  // 创建订单
-  static Future<Map<String, dynamic>> createOrder(
-    String token,
-    int serviceId,
-    int countryId,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/orders'),
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': apiKey,
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'service_id': serviceId,
-        'country_id': countryId,
-      }),
-    );
-    return jsonDecode(response.body);
-  }
-  
-  // 激活订单
-  static Future<Map<String, dynamic>> activateOrder(
-    String token,
-    String orderId,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/orders/$orderId/activate'),
-      headers: {
-        'X-API-Key': apiKey,
-        'Authorization': 'Bearer $token',
-      },
-    );
-    return jsonDecode(response.body);
-  }
+});
+```
+
+#### 邮箱一键注册
+
+```dart
+final resp = await apiService.register(
+  email: 'newuser@example.com',
+  password: 'MyStr0ng!Pass',
+);
+
+// resp.credentials.{username, password, email} 仅返回一次
+// 必须用 AlertDialog 展示给用户
+showDialog(
+  context: context,
+  builder: (_) => CredentialsDialog(credentials: resp['credentials']),
+);
+```
+
+#### 忘记密码
+
+```dart
+final resp = await authProvider.forgotPassword('user@example.com');
+
+if (resp['new_password'] != null) {
+  // 后端生成了新密码
+  showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: Text('新密码已生成'),
+      content: SelectableText(resp['new_password']),
+    ),
+  );
 }
 ```
 
@@ -983,64 +1088,13 @@ class SmsApiClient {
 
 ## 完整使用流程
 
-### 1. 用户注册/登录
-
 ```
-POST /auth/register
-{
-  "device_id": "unique_device_id"
-}
-
-→ 获得 token 和用户信息
-```
-
-### 2. 浏览服务
-
-```
-GET /service-countries/published
-Headers: X-API-Key, Authorization
-
-→ 获得所有可用的服务-国家组合
-```
-
-### 3. 创建订单
-
-```
-POST /orders
-{
-  "service_id": 1,
-  "country_id": 1
-}
-Headers: X-API-Key, Authorization
-
-→ 创建pending状态订单
-```
-
-### 4. 激活订单
-
-```
-POST /orders/{order_id}/activate
-Headers: X-API-Key, Authorization
-
-→ 获得真实手机号码
-→ 订单状态变为active
-→ 开始20分钟倒计时
-```
-
-### 5. 等待验证码
-
-```
-GET /orders/{order_id}
-Headers: X-API-Key, Authorization
-
-→ 轮询获取订单状态
-→ 当sms_code不为空时表示收到验证码
-```
-
-### 6. 使用验证码
-
-```
-复制验证码到目标平台完成注册
+1. POST /auth/manual-register        → 注册并获得 token
+2. GET  /service-countries/published  → 浏览服务-国家(显示价格)
+3. POST /orders                       → 创建 pending 订单(扣积分)
+4. POST /orders/{id}/activate         → 拿真实号码
+5. GET  /orders/{id}  (轮询 5s)       → 等待 sms_code 非空
+6. POST /orders/{id}/cancel (可选)    → 不想用了取消(仅 pending)
 ```
 
 ---
@@ -1049,52 +1103,41 @@ Headers: X-API-Key, Authorization
 
 ### 1. 订单时效
 
-- **Pending订单**: 24小时有效期，超时自动过期
-- **Active订单**: 20分钟超时，超时自动完成
-- 超时未收到短信不退款
+- **Pending 订单**: 24h 有效期,超时自动 expired 退款
+- **Active 订单**: 20min 收码窗口,超时自动 expired 退款
+- 退款写 `credit_transactions` 流水
 
 ### 2. 积分规则
 
-- 创建订单时扣除积分
-- 取消pending订单退还积分
-- Active/Completed订单不可退款
+- 创建订单扣积分
+- 取消 pending 订单退积分
+- 激活失败自动退积分
+- active/completed 不可退
 
 ### 3. 轮询建议
 
-- 建议每5-10秒轮询一次订单状态
-- 不要过于频繁请求，避免被限流
-- 收到验证码后停止轮询
+- 建议每 5-10 秒轮询一次
+- 收码后立即停止轮询
+- 可依赖本地通知推送(webhook + FCM/APNs)
 
-### 4. 错误处理
+### 4. 安全
 
-- 始终检查响应的success字段
-- 根据error和code字段处理错误
-- 网络错误时实现重试机制
+- API Key 通过 `--dart-define=API_KEY=xxx` 编译注入
+- Token 用 `flutter_secure_storage` 存 Keychain/Keystore
+- 用户密码用 bcrypt 哈希
+- HeroSMS API Key 从数据库 `system_settings` 读,不入代码
 
-### 5. 安全建议
+### 5. 字段命名规范
 
-- 不要在客户端硬编码API Key
-- Token应安全存储（如Keychain/Keystore）
-- 使用HTTPS确保传输安全
-- 定期刷新Token
-
----
-
-## 更新日志
-
-### v1.0 (2026-05-12)
-- 初始版本发布
-- 支持设备注册/登录
-- 支持邮箱注册/登录
-- 支持服务浏览和订单管理
-- 支持Apple IAP支付
+- 后端返驼峰或下划线均可,客户端 `fromJson` 兼容两种
+- 价格字段:**decimal 优先**(用 double 接收)
+- 时间字段:**ISO 8601 字符串**
 
 ---
 
 ## 技术支持
 
-如有问题，请联系技术支持团队。
-
-**API Base URL**: https://smsapi2.niceapp.eu.cc/api  
-**文档版本**: v1.0  
-**最后更新**: 2026-05-12
+- **API Base URL**: `https://<your-domain>/api`
+- **文档版本**: v1.2
+- **最后更新**: 2026-06-02
+- **配套文档**: [INDEX.md](INDEX.md) | [ERROR_HANDLING.md](ERROR_HANDLING.md) | [BEST_PRACTICES.md](BEST_PRACTICES.md) | [HEROSMS_API.md](HEROSMS_API.md)

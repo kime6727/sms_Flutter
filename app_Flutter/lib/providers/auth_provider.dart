@@ -27,6 +27,22 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider(this._apiService) {
     _checkAuthStatus();
+    // 监听 401/403：清掉本地状态，让 GoRouter 的 redirect 跳转到登录页
+    ApiService.addOnUnauthorizedListener(_handleUnauthorized);
+  }
+
+  @override
+  void dispose() {
+    ApiService.removeOnUnauthorizedListener(_handleUnauthorized);
+    super.dispose();
+  }
+
+  /// 401 回调：清本地认证状态（AuthChangeNotifier 触发 GoRouter redirect）
+  void _handleUnauthorized() {
+    _user = null;
+    _isAuthenticated = false;
+    _error = '登录已过期，请重新登录';
+    notifyListeners();
   }
 
   /// B27: 统一的 notify 入口，除通知 Provider 监听者外，
@@ -209,11 +225,11 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  /// 改用 forgot-password 流程：后端生成新密码并直接返回，前端展示给用户
+  /// 原 reset-password 流程需要 reset_token，过于复杂，对应场景已废弃
   Future<Map<String, dynamic>> resetPassword(String email, String newPassword) async {
-    return await _apiService.post('/auth/reset-password', body: {
-      'email': email,
-      'new_password': newPassword,
-    });
+    // 忽略前端传入的 newPassword，统一由后端生成（更安全，避免用户弱密码）
+    return await forgotPassword(email);
   }
 
   Future<Map<String, dynamic>> updateProfile({

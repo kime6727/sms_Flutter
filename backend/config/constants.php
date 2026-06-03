@@ -29,8 +29,9 @@ define('PENDING_ORDER_EXPIRE_HOURS_DEFAULT', 72);
 define('ACTIVE_ORDER_TIMEOUT_MINUTES_DEFAULT', 20);
 
 // ==================== 价格系数（默认值）====================
-define('COEFFICIENT_BEFORE_DEFAULT', 2.0);  // 首充前系数
-define('COEFFICIENT_AFTER_DEFAULT', 4.0);   // 首充后系数
+// 与 routes/services.php 保持一致：首充前 4.0，首充后 4.5
+define('COEFFICIENT_BEFORE_DEFAULT', 4.0);
+define('COEFFICIENT_AFTER_DEFAULT', 4.5);
 
 // ==================== 限流配置 ====================
 define('RATE_LIMIT_MAX_REQUESTS', 60);

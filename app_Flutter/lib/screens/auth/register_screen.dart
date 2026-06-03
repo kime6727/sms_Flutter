@@ -236,7 +236,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         if (value == null || value.isEmpty) {
                           return loc.translate('password_required');
                         }
-                        if (value.length < 6) {
+                        if (value.length < 8) {
                           return loc.translate('password_too_short');
                         }
                         return null;

@@ -242,6 +242,7 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   `title` varchar(100) DEFAULT NULL,
   `body` text,
   `data` json DEFAULT NULL,
+  `related_order_id` varchar(36) DEFAULT NULL,
   `status` varchar(20) DEFAULT 'pending',
   `sent_at` datetime DEFAULT NULL,
   `read_at` datetime DEFAULT NULL,
@@ -250,7 +251,8 @@ CREATE TABLE IF NOT EXISTS `notifications` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_status` (`status`),
   KEY `idx_created_at` (`created_at`),
-  KEY `idx_notifications_user_read` (`user_id`, `status`)
+  KEY `idx_notifications_user_read` (`user_id`, `status`),
+  KEY `idx_related_order_id` (`related_order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

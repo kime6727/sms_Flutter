@@ -155,26 +155,26 @@ if ($path === '/user/profile' && $method === 'PUT') {
         
         // 修改密码
         if ($oldPassword && $newPassword) {
-            if (strlen($newPassword) < 6) {
-                apiError('新密码长度至少6位', 400, 'password_too_short');
+            if (strlen($newPassword) < 8) {
+                apiError('新密码长度至少8位', 400, 'password_too_short');
             }
-            
+
             $user = $db->query("SELECT password_hash FROM users WHERE id = ?", [$userId])->fetch();
             if (!$user || !$user['password_hash']) {
                 apiError('当前未设置密码', 400, 'no_password_set');
             }
-            
+
             if (!password_verify($oldPassword, $user['password_hash'])) {
                 apiError('原密码不正确', 400, 'wrong_password');
             }
-            
+
             $db->query(
                 "UPDATE users SET password_hash = ? WHERE id = ?",
                 [password_hash($newPassword, PASSWORD_BCRYPT), $userId]
             );
         } elseif ($setPassword) {
-            if (strlen($setPassword) < 6) {
-                apiError('密码长度至少6位', 400, 'password_too_short');
+            if (strlen($setPassword) < 8) {
+                apiError('密码长度至少8位', 400, 'password_too_short');
             }
             
             $db->query(

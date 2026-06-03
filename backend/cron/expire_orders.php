@@ -61,7 +61,7 @@ foreach ($expiredOrders as $order) {
                 'user_id' => $order['user_id'],
                 'type' => 'order_expired',
                 'title' => '号码已过期',
-                'content' => "订单 #{$order['id']} 中的 {$order['service_name']} - {$order['country_name']} 号码已过期",
+                'body' => "订单 #{$order['id']} 中的 {$order['service_name']} - {$order['country_name']} 号码已过期",
                 'related_order_id' => $order['id'],
                 'created_at' => date('Y-m-d H:i:s')
             ]);

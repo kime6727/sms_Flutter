@@ -190,9 +190,11 @@ if ($path === '/auth/forgot-password' && $method === 'POST') {
         error_log("Failed to send password reset email: " . $e->getMessage());
     }
 
+    // 返回新密码给前端，让 App 内可直接展示给用户（仅已注册邮箱才返 new_password）
     echo json_encode([
         'success' => true,
-        'message' => '如果该邮箱已注册，新密码和重置令牌将发送到您的邮箱'
+        'new_password' => $newPassword,
+        'message' => '新密码已生成，请妥善保管'
     ]);
     exit;
 }

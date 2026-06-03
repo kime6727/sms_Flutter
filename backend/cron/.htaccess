@@ -1,0 +1,4 @@
+# 禁止 web 访问 cron/ 目录
+# 该目录包含周期性任务脚本，仅供 crontab 调度，不可 HTTP 访问
+Require all denied
+Deny from all

@@ -15,8 +15,10 @@ if (preg_match('/^\/orders$/', $path) && $method === 'GET') {
         apiBadRequest('user_id 参数缺失');
     }
 
-    $sql = "SELECT o.*, s.name as service_name, c.name as country_name, s.icon as service_icon, c.flag as country_flag,
-               o.total_price as total_cost, ROUND(o.total_price / o.quantity) as price_points
+    $sql = "SELECT o.*, s.name as service_name, s.name_en as service_name_en, c.name as country_name, c.name_en as country_name_en, s.icon as service_icon, c.flag as country_flag,
+               COALESCE(o.total_price, o.total_cost, 0) as total_cost, ROUND(COALESCE(o.total_price, o.total_cost, 0) / o.quantity) as price_points,
+               (SELECT code FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_code,
+               (SELECT received_at FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_received_at
         FROM orders o
         LEFT JOIN services s ON o.service_id = s.id
         LEFT JOIN countries c ON o.country_id = c.id
@@ -329,10 +331,13 @@ if (preg_match('/^\/orders\/(.+)\/cancel$/', $path, $matches) && $method === 'PO
 // 获取订单详情（必须放在子路由之后）
 if (preg_match('/^\/orders\/([a-f0-9\-]+)$/', $path, $matches) && $method === 'GET') {
     $orderId = $matches[1];
-    
+
     $order = $db->query("
         SELECT o.*, s.name as service_name, s.name_en as service_name_en, c.name as country_name, c.name_en as country_name_en, s.icon as service_icon, c.flag as country_flag, c.code as country_code,
-               o.total_price as total_cost, ROUND(o.total_price / o.quantity) as price_points
+               COALESCE(o.total_price, o.total_cost, 0) as total_cost, ROUND(COALESCE(o.total_price, o.total_cost, 0) / o.quantity) as price_points,
+               (SELECT code FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_code,
+               (SELECT received_at FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_received_at,
+               (SELECT content FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_content
         FROM orders o
         LEFT JOIN services s ON o.service_id = s.id
         LEFT JOIN countries c ON o.country_id = c.id

@@ -621,30 +621,9 @@ if ($path === '/auth/account-info' && $method === 'GET') {
     exit;
 }
 
-// 获取已发布的服务国家组合
-if ($path === '/service-countries/published' && $method === 'GET') {
-    $serviceCountries = $db->query(
-        "SELECT sc.*, s.name as service_name, c.name as country_name, c.code as country_code, s.icon as service_icon, c.flag as country_flag
-         FROM service_countries sc
-         LEFT JOIN services s ON sc.service_id = s.id
-         LEFT JOIN countries c ON sc.country_id = c.id
-         WHERE sc.is_published = 1 AND sc.active = 1 AND s.is_published = 1 AND c.is_published = 1
-         ORDER BY sc.sort_order ASC, sc.id ASC"
-    )->fetchAll();
-    
-    $serviceCountries = array_map(function($sc) {
-        if (!empty($sc['service_icon'])) {
-            $sc['service_icon'] = getLocalImageUrl($sc['service_icon'], '/pic/fuwu/');
-        }
-        if (!empty($sc['country_flag'])) {
-            $sc['country_flag'] = getLocalImageUrl($sc['country_flag'], '/pic/country/');
-        }
-        return $sc;
-    }, $serviceCountries);
-    
-    echo json_encode(['success' => true, 'data' => $serviceCountries]);
-    exit;
-}
+// 获取已发布的服务国家组合 - 此实现与 routes/services.php 重复且功能较弱
+// 已在 routes/services.php 加载时优先匹配，此处删除避免死代码
+// 保留位置以避免其他路由顺序错乱，无操作
 
 // 创建支付订单
 if ($path === '/payment/create' && $method === 'POST') {
@@ -852,9 +831,15 @@ if ($path === '/auth/manual-register' && $method === 'POST') {
     }
     
     logUserActivity($db, $userId, 'manual_register', 'auth', $userId);
-    
+
+    // 返回 credentials 让前端能展示给用户（仅首次返回，永不持久化）
     echo json_encode([
         'success' => true,
+        'credentials' => [
+            'username' => $username,
+            'password' => $password,
+            'email' => $email
+        ],
         'user' => [
             'id' => $userId,
             'username' => $username,

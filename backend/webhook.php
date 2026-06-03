@@ -121,7 +121,7 @@ try {
             "SELECT id FROM sms_messages WHERE order_id = ? AND content = ?",
             [$orderId, $smsText]
         )->fetch();
-        
+
         if (!$existingSms) {
             $db->insert('sms_messages', [
                 'order_id' => $orderId,
@@ -132,15 +132,18 @@ try {
             ]);
             logMessage("短信已保存: orderId=$orderId, code=$smsCode");
         }
-        
+
         // 更新订单状态为已完成
+        // 注: orders 表本身没有 sms_code 列,验证码存在 sms_messages.code 里
+        // 这里只更新 status 和 completed_at
         $db->query(
-            "UPDATE orders SET status = 'completed', completed_at = NOW(), sms_code = ? WHERE id = ?",
-            [$smsCode, $orderId]
+            "UPDATE orders SET status = 'completed', completed_at = NOW() WHERE id = ?",
+            [$orderId]
         );
         logMessage("订单已更新为完成: orderId=$orderId");
-        
+
         // 创建通知
+        // 注: 配套迁移 20260602_add_notifications_related_order.sql 已添加 related_order_id 列
         $db->insert('notifications', [
             'user_id' => $userId,
             'type' => 'sms_received',
@@ -150,7 +153,7 @@ try {
             'created_at' => date('Y-m-d H:i:s')
         ]);
         logMessage("通知已创建: userId=$userId, orderId=$orderId");
-        
+
         $db->commit();
     } catch (Exception $e) {
         $db->rollBack();

@@ -17,9 +17,24 @@ class ApiService {
   static const int maxRetries = 3;
   static const Duration retryDelay = Duration(milliseconds: 500);
 
+  /// 401/403 时的回调列表，由 AuthProvider 注入用于触发跳转到登录页
+  static final List<void Function()> _onUnauthorizedListeners = [];
+
+  /// 注册一个未授权回调（401 时会清 token 并回调）
+  static void addOnUnauthorizedListener(void Function() listener) {
+    _onUnauthorizedListeners.add(listener);
+  }
+
+  /// 移除未授权回调
+  static void removeOnUnauthorizedListener(void Function() listener) {
+    _onUnauthorizedListeners.remove(listener);
+  }
+
   String? get token => _token;
   String? get deviceId => _deviceId;
   String? get userId => _userId;
+  /// API Key 是否可用（用于健康检查等场景）
+  bool get hasApiKey => (_apiKey != null && _apiKey!.isNotEmpty);
 
   ApiService() {
     _httpClient = createPlatformClient();
@@ -34,10 +49,9 @@ class ApiService {
       _deviceId = _generateDeviceId();
       await StorageService.setString('device_id', _deviceId!);
     }
+    // 不再抛异常：API_KEY 缺失时记录日志，App 仍可启动到健康检查页
     if (_apiKey == null || _apiKey!.isEmpty) {
-      throw StateError(
-        'API_KEY 未配置。请使用 --dart-define=API_KEY=xxxx 构建。',
-      );
+      debugPrint('⚠️ API_KEY 未配置。请使用 --dart-define=API_KEY=xxxx 构建。');
     }
   }
 
@@ -197,12 +211,20 @@ class ApiService {
       );
     }
 
-    if (response.statusCode == 401) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
       clearToken();
+      // 触发 401 监听器，让 AuthProvider 跳转到登录页
+      for (final listener in _onUnauthorizedListeners) {
+        try {
+          listener();
+        } catch (e) {
+          debugPrint('onUnauthorized listener error: $e');
+        }
+      }
       throw ApiException(
         code: 'UNAUTHORIZED',
         message: 'Token expired or invalid, please login again',
-        statusCode: 401,
+        statusCode: response.statusCode,
         data: data,
       );
     }

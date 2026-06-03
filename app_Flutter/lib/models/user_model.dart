@@ -3,10 +3,13 @@ class UserModel {
   final String username;
   final String email;
   final int points;
-  final int totalSpent;
+  /// 后端返回的是 decimal（DECIMAL(10,2)），这里用 double 保持精度
+  final double totalSpent;
   final int orderCount;
   final bool hasTopupHistory;
   final String? firstTopupExpiresAt;
+  /// 后端通过 /user/profile 返回的剩余倒计时小时数（非零即表示首充仍有效）
+  final int firstTopupCountdownHours;
   final MembershipInfo? membership;
   final NextLevelInfo? nextLevel;
   final ProgressInfo? progress;
@@ -19,10 +22,11 @@ class UserModel {
     required this.username,
     required this.email,
     required this.points,
-    this.totalSpent = 0,
+    this.totalSpent = 0.0,
     this.orderCount = 0,
     required this.hasTopupHistory,
     this.firstTopupExpiresAt,
+    this.firstTopupCountdownHours = 0,
     this.membership,
     this.nextLevel,
     this.progress,
@@ -37,10 +41,15 @@ class UserModel {
       username: json['username']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       points: json['points'] ?? json['balance'] ?? 0,
-      totalSpent: (json['total_spent'] ?? 0).round(),
+      totalSpent: (json['total_spent'] is num)
+          ? (json['total_spent'] as num).toDouble()
+          : double.tryParse(json['total_spent']?.toString() ?? '0') ?? 0.0,
       orderCount: json['order_count'] ?? 0,
       hasTopupHistory: json['has_topup_history'] ?? false,
       firstTopupExpiresAt: json['first_topup_expires_at']?.toString(),
+      firstTopupCountdownHours: (json['first_topup_countdown_hours'] ?? 0) is int
+          ? json['first_topup_countdown_hours']
+          : (json['first_topup_countdown_hours'] as num?)?.toInt() ?? 0,
       membership: json['membership'] != null ? MembershipInfo.fromJson(json['membership']) : null,
       nextLevel: json['next_level'] != null ? NextLevelInfo.fromJson(json['next_level']) : null,
       progress: json['progress'] != null ? ProgressInfo.fromJson(json['progress']) : null,
@@ -75,7 +84,7 @@ class UserModel {
     String? username,
     String? email,
     int? points,
-    int? totalSpent,
+    double? totalSpent,
     int? orderCount,
     bool? hasTopupHistory,
     String? firstTopupExpiresAt,
@@ -105,6 +114,8 @@ class UserModel {
   }
 
   bool get hasFirstTopupBonus {
+    // 优先用后端返回的倒计时小时数（准确），兼容旧的 expires_at 字段
+    if (firstTopupCountdownHours > 0) return true;
     if (firstTopupExpiresAt == null) return false;
     final expires = DateTime.tryParse(firstTopupExpiresAt!);
     return expires != null && expires.isAfter(DateTime.now());
@@ -132,7 +143,8 @@ class UserModel {
 class MembershipInfo {
   final String level;
   final String levelCn;
-  final int minSpent;
+  /// 后端返回的是 decimal（DECIMAL(10,2)），用 double 保持精度
+  final double minSpent;
   final double discount;
   final String? icon;
   final String? color;
@@ -140,7 +152,7 @@ class MembershipInfo {
   MembershipInfo({
     required this.level,
     required this.levelCn,
-    this.minSpent = 0,
+    this.minSpent = 0.0,
     this.discount = 1.0,
     this.icon,
     this.color,
@@ -150,7 +162,9 @@ class MembershipInfo {
     return MembershipInfo(
       level: json['level'] ?? '',
       levelCn: json['level_cn'] ?? '',
-      minSpent: (json['min_spent'] ?? 0).round(),
+      minSpent: (json['min_spent'] is num)
+          ? (json['min_spent'] as num).toDouble()
+          : double.tryParse(json['min_spent']?.toString() ?? '0') ?? 0.0,
       discount: json['discount'] ?? 1.0,
       icon: json['icon'],
       color: json['color'],
@@ -172,13 +186,13 @@ class MembershipInfo {
 class NextLevelInfo {
   final String level;
   final String levelCn;
-  final int minSpent;
+  final double minSpent;
   final double discount;
 
   NextLevelInfo({
     required this.level,
     required this.levelCn,
-    this.minSpent = 0,
+    this.minSpent = 0.0,
     this.discount = 1.0,
   });
 
@@ -186,7 +200,9 @@ class NextLevelInfo {
     return NextLevelInfo(
       level: json['level'] ?? '',
       levelCn: json['level_cn'] ?? '',
-      minSpent: (json['min_spent'] ?? 0).round(),
+      minSpent: (json['min_spent'] is num)
+          ? (json['min_spent'] as num).toDouble()
+          : double.tryParse(json['min_spent']?.toString() ?? '0') ?? 0.0,
       discount: json['discount'] ?? 1.0,
     );
   }
@@ -232,7 +248,7 @@ class ProgressInfo {
 class LevelInfo {
   final String name;
   final String nameCn;
-  final int minSpent;
+  final double minSpent;
   final double discount;
   final String? icon;
   final String? color;
@@ -240,7 +256,7 @@ class LevelInfo {
   LevelInfo({
     required this.name,
     required this.nameCn,
-    this.minSpent = 0,
+    this.minSpent = 0.0,
     this.discount = 1.0,
     this.icon,
     this.color,
@@ -250,7 +266,9 @@ class LevelInfo {
     return LevelInfo(
       name: json['name'] ?? '',
       nameCn: json['name_cn'] ?? '',
-      minSpent: (json['min_spent'] ?? 0).round(),
+      minSpent: (json['min_spent'] is num)
+          ? (json['min_spent'] as num).toDouble()
+          : double.tryParse(json['min_spent']?.toString() ?? '0') ?? 0.0,
       discount: json['discount'] ?? 1.0,
       icon: json['icon'],
       color: json['color'],
