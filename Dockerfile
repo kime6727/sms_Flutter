@@ -62,6 +62,12 @@ COPY backend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# 兼容用户配置的 DB_SSL_CA=/etc/ssl/cert.pem
+# Debian 的 CA bundle 实际在 /etc/ssl/certs/ca-certificates.crt
+# TiDB Cloud 默认提示的 /etc/ssl/cert.pem 不存在，所以建个软链
+RUN ln -sf /etc/ssl/certs/ca-certificates.crt /etc/ssl/cert.pem \
+    && ls -la /etc/ssl/cert.pem /etc/ssl/certs/ca-certificates.crt
+
 # 工作目录
 WORKDIR /app
 

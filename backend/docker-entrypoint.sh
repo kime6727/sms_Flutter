@@ -39,16 +39,26 @@ mkdir -p /run/php
 echo "[entrypoint] starting php-fpm..."
 php-fpm -D
 
-# 等 php-fpm 起来
-sleep 1
+# 等 php-fpm 起来（最多 10 秒）
+echo "[entrypoint] waiting for php-fpm..."
+for i in 1 2 3 4 5 6 7 8 9 10; do
+    if php-fpm -t >/dev/null 2>&1; then
+        echo "[entrypoint] php-fpm ready (after ${i}s) ✓"
+        break
+    fi
+    sleep 1
+done
 
-# 验证 php-fpm 监听 9000
-if (echo > /dev/tcp/127.0.0.1/9000) 2>/dev/null; then
-    echo "[entrypoint] php-fpm listening on 127.0.0.1:9000 ✓"
+# 显示实际监听地址
+echo "[entrypoint] php-fpm listen config:"
+grep -h "^listen" /usr/local/etc/php-fpm.d/*.conf 2>/dev/null | sed 's/^/[entrypoint]   /'
+ss -tlnp 2>/dev/null | grep -E ':9000|php-fpm' | sed 's/^/[entrypoint]   /' || true
+
+# 验证 CA 证书（用于 TiDB Cloud SSL 连接）
+if [ -f /etc/ssl/cert.pem ]; then
+    echo "[entrypoint] /etc/ssl/cert.pem exists ($(stat -c%s /etc/ssl/cert.pem 2>/dev/null) bytes) ✓"
 else
-    echo "[entrypoint] WARNING: php-fpm NOT listening on 127.0.0.1:9000" >&2
-    echo "[entrypoint] php-fpm config listen line:" >&2
-    grep -h "^listen" /usr/local/etc/php-fpm.d/*.conf >&2
+    echo "[entrypoint] WARNING: /etc/ssl/cert.pem NOT FOUND" >&2
 fi
 
 # 验证 nginx 配置
