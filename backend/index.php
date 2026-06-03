@@ -85,8 +85,97 @@ function apiServerError($error = '服务器内部错误') {
     apiError($error, 500);
 }
 
-// 初始化数据库
-$db = new Database(DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT);
+// 提前解析请求路径（在 DB 初始化前就准备好，错误页能正确分流到 /install）
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+// 移除前缀（如果有）
+if (strpos($path, '/api') === 0) {
+    $path = substr($path, 4);
+}
+
+// 确保路径以 / 开头
+if (strpos($path, '/') !== 0) {
+    $path = '/' . $path;
+}
+
+// 初始化数据库 - 失败时输出友好错误页而不是 500 空 body
+try {
+    $db = new Database(DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT);
+} catch (Exception $e) {
+    $errMsg = $e->getMessage();
+    error_log("[index] DB init failed: " . $errMsg);
+
+    // 未连接成功时，/install 路径返回友好的诊断页（HTML）
+    if (preg_match('#^/install(/.*)?$#', $path)) {
+        header('Content-Type: text/html; charset=utf-8');
+        http_response_code(503);
+        echo <<<HTML
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>数据库未就绪 - SMS 接码平台</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+         min-height: 100vh; margin: 0; display: flex; align-items: center;
+         justify-content: center; padding: 20px; }
+  .card { background: #fff; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+          max-width: 720px; width: 100%; overflow: hidden; }
+  .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #fff; padding: 30px; }
+  .header h1 { margin: 0 0 8px 0; font-size: 22px; }
+  .body { padding: 30px; }
+  .err { background: #fee2e2; color: #991b1b; padding: 16px; border-radius: 8px;
+         border-left: 4px solid #dc2626; font-family: monospace; font-size: 13px;
+         white-space: pre-wrap; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
+  th { color: #666; font-weight: 500; width: 140px; }
+  td { font-family: monospace; font-weight: 600; }
+  .hint { margin-top: 20px; padding: 12px; background: #fff3cd; color: #856404;
+          border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>⚠️ 数据库连接失败</h1>
+    <small>SMS 接码平台 - 安装向导</small>
+  </div>
+  <div class="body">
+    <div class="err">$errMsg</div>
+    <table>
+      <tr><th>Host</th><td>DB_HOST</td></tr>
+      <tr><th>Port</th><td>DB_PORT</td></tr>
+      <tr><th>Database</th><td>DB_NAME</td></tr>
+      <tr><th>User</th><td>DB_USER</td></tr>
+    </table>
+    <div class="hint">
+      💡 请在 dokploy → sms-receiver → Environment 中检查 DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS 是否正确。
+      修复后刷新此页重试。
+    </div>
+  </div>
+</div>
+</body>
+</html>
+HTML;
+        exit;
+    }
+
+    // 其他路径返回 JSON
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(503);
+    echo json_encode([
+        'success' => false,
+        'error' => 'database_unavailable',
+        'message' => $errMsg,
+        'install_url' => '/install',
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
 
 // 初始化服务 - hero-sms API 密钥从数据库安全读取
 $heroSmsApiKey = KeyManager::getHeroSmsApiKey();
@@ -143,20 +232,7 @@ function logUserActivity($db, $userId, $action, $resource = null, $resourceId = 
     }
 }
 
-// 解析请求路径和方法
-$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-$path = parse_url($requestUri, PHP_URL_PATH);
-$method = $_SERVER['REQUEST_METHOD'];
-
-// 移除前缀（如果有）
-if (strpos($path, '/api') === 0) {
-    $path = substr($path, 4);
-}
-
-// 确保路径以 / 开头
-if (strpos($path, '/') !== 0) {
-    $path = '/' . $path;
-}
+// 解析请求路径和方法（已在上方 DB 初始化前完成）
 
 // WordPress 风格自安装：
 //   - 数据库连上后，先检查是否已初始化（admins 表是否存在）
