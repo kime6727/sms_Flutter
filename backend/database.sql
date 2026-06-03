@@ -450,27 +450,8 @@ CREATE TABLE IF NOT EXISTS `operation_logs` (
 
 -- ============================================
 -- 外键约束
+-- 注：所有 FOREIGN KEY 约束已移除（见文件顶部说明）
 -- ============================================
-ALTER TABLE `admin_logs`
-
-ALTER TABLE `credit_transactions`
-
-ALTER TABLE `devices`
-
-ALTER TABLE `favorites`
-
-ALTER TABLE `notifications`
-
-ALTER TABLE `orders`
-
-ALTER TABLE `payment_records`
-
-ALTER TABLE `service_countries`
-
-ALTER TABLE `sms_messages`
-
-COMMIT;
-
 -- Part B: 增量迁移
 -- ---------------------------------------------------------------------
 
