@@ -57,6 +57,10 @@ cmds = [
     "chmod 755 /var/log/nginx /var/cache/nginx /var/lib/nginx /run/nginx",
     "touch /var/log/nginx/error.log /var/log/nginx/access.log",
     "chmod 666 /var/log/nginx/error.log /var/log/nginx/access.log",
+    "echo '--- create php-fpm log dirs ---'",
+    "mkdir -p /var/log/php-fpm /run/php",
+    "touch /var/log/php-fpm/error.log",
+    "chmod 666 /var/log/php-fpm/error.log",
     "echo '--- php version ---'",
     "php -v",
     "echo '--- php modules ---'",
@@ -64,16 +68,13 @@ cmds = [
 ]
 
 # ====================
-# 启动阶段：PHP 内置服务器 + router.php
+# 启动阶段：用我们自己的 nginx 配置（已含 try_files 路由），
+# 跳过 Nixpacks 的 prestart.mjs（它用的默认模板不路由到 index.php）
 # ====================
-# PHP 内置服务器：
-#   - 单线程（适合低流量/内部系统）
-#   - 自动处理静态文件
-#   - 通过 router.php 把非静态请求路由到 index.php
-# 这样避免了 php-fpm + nginx 协调的复杂性，不再 502。
-# 端口固定 80（与 Dokploy Traefik 路由一致）。
 [phases.start]
-cmd = "exec php -S 0.0.0.0:80 -t /app /app/router.php"
+cmd = """php-fpm -y /assets/php-fpm.conf 2>&1 | tee /var/log/php-fpm-runtime.log & \
+sleep 1 && \
+nginx -c /app/nginx.nixpacks.conf -g 'daemon off;' 2>&1 | tee /var/log/nginx-runtime.log"""
 
 [variables]
 PORT = "80"
