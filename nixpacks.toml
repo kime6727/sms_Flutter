@@ -14,6 +14,13 @@
 providers = ["php"]
 
 # ====================
+# 安装阶段：明确安装 PHP + Composer
+# providers = ["php"] 不会自动加包，必须在 setup 阶段显式指定
+# ====================
+[phases.setup]
+nixPkgs = ["php82", "php82Packages.composer"]
+
+# ====================
 # 安装阶段：覆盖默认的 npm ci
 # 项目根有 package.json（playwright 测试依赖），但部署不需要 node_modules。
 # 用空 cmd 列表让 Nixpacks 跳过 install 阶段。
