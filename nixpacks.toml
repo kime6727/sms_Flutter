@@ -1,16 +1,24 @@
-# Nixpacks 配置文件
-# 显式声明 PHP，避免 Nixpacks 误判为 Node.js
+# Nixpacks 配置文件 - 走默认 PHP 模板 (php-fpm + nginx)
+# 默认模板会自己处理 /health 等路由（用了 try_files 风格），
+# 我们只需要补齐 nodejs 避免 npm 报错。
+#
+# 注意：项目根有个 package.json（playwright 测试用的），
+# 它会触发 Nixpacks 的 Node.js 自动检测，从而在 install 阶段跑 npm ci。
+# 我们的部署是纯 PHP，npm ci 是无效的，必须明确覆盖掉。
 
 providers = ["php"]
 
-# ====================
-# 安装阶段
-# ====================
-# nixpkgs 的 php82 已经内置 pdo_mysql / mysqli / bcmath / curl / mbstring /
-# openssl / pdo / xml / zip 等常用扩展，无需单独指定 xxx-bcmath 这种包。
-# nix 中 PHP 扩展包不存在独立名字（早期 php72-bcmath 命名已废弃）。
+# 默认 PHP 模板需要 nodejs（用于 prestart.mjs 处理 nginx 模板）
 [phases.setup]
-nixPkgs = ["php82", "nginx"]
+nixPkgs = ["php82", "php82Packages.composer", "nginx", "nodejs"]
+
+# ====================
+# 安装阶段：覆盖默认的 npm ci
+# 项目根有 package.json（playwright 测试依赖），但部署不需要 node_modules。
+# 用空 cmd 列表让 Nixpacks 跳过 install 阶段。
+# ====================
+[phases.install]
+cmds = []
 
 # ====================
 # 构建阶段：把 backend/ 内容复制到 /app
@@ -21,22 +29,18 @@ cmds = [
     "mkdir -p /app",
     "cp -r backend/. /app/",
     "chmod -R 755 /app",
-    "echo '--- /app contents ---'",
-    "ls -la /app | head -20",
-    "echo '--- php version ---'",
+    "ls -la /app | head -10",
     "php -v",
-    "echo '--- php modules ---'",
-    "php -m | grep -iE 'pdo|mysql|bcmath|curl|mbstring|openssl|xml|zip'",
+    "php -m | grep -iE 'pdo|mysql|bcmath|curl|mbstring|openssl|xml|zip' || true",
 ]
 
 # ====================
-# 启动阶段：php 内置服务器
+# 启动阶段：让 Nixpacks 用默认 PHP 启动 (php-fpm + nginx)
+# 不要覆盖，否则会触发奇怪的 prestart 逻辑
 # ====================
-# PHP 7.4+ 内置服务器会自动把未匹配的文件请求路由到 index.php，
-# 这正好替代了 nginx 的 try_files 规则，
-# 解决 /health /api/health 等路径 404 的问题。
-[phases.start]
-cmd = "php -S 0.0.0.0:${PORT:-80} -t /app"
+# 默认命令（不要写）:
+#   node /assets/scripts/prestart.mjs /assets/nginx.template.conf /nginx.conf
+#   && (php-fpm -y /assets/php-fpm.conf & nginx -c /nginx.conf)
 
 [variables]
 PORT = "80"
