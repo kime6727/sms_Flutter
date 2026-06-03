@@ -156,6 +156,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` varchar(20) DEFAULT 'user',
   `balance` decimal(10,2) DEFAULT '0.00',
   `total_recharge` decimal(10,2) DEFAULT '0.00',
+  `total_spent` decimal(10,2) DEFAULT '0.00' COMMENT '累计消费（用于优惠/等级判断）',
+  `order_count` int DEFAULT 0 COMMENT '订单总数',
   `first_recharge_at` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `login_ip` varchar(45) DEFAULT NULL,
@@ -624,6 +626,12 @@ CREATE TABLE IF NOT EXISTS `banners` (
 -- 适用于 MySQL 5.7.44
 -- 执行日期: 2026-05-16
 -- ============================================
+
+-- 0. 添加 total_spent / order_count 字段（密码登录 / 订单查询用到）
+-- MySQL 8.0+ 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS，依赖 Installer 跳过 Duplicate column name
+ALTER TABLE users
+  ADD COLUMN total_spent decimal(10,2) DEFAULT '0.00' COMMENT '累计消费',
+  ADD COLUMN order_count int DEFAULT 0 COMMENT '订单总数';
 
 -- 1. 添加 Google/Apple 登录支持字段
 -- MySQL 8.0+ 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS，依赖 Installer 跳过 Duplicate column name
