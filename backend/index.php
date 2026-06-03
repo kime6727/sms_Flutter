@@ -39,6 +39,7 @@ require_once __DIR__ . '/lib/Auth.php';
 require_once __DIR__ . '/lib/Logger.php';
 require_once __DIR__ . '/lib/KeyManager.php';
 require_once __DIR__ . '/lib/RateLimiter.php';
+require_once __DIR__ . '/lib/Installer.php';
 
 // 加载辅助函数
 require_once __DIR__ . '/helpers/functions.php';

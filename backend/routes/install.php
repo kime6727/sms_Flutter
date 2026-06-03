@@ -23,7 +23,7 @@ if ($path === '/install/status' && $method === 'GET') {
         'success' => true,
         'installed' => $dbReady,
         'installing' => $installer->isInstalling(),
-        'marker_file' => file_exists($installer->markerFile ?? ''),
+        'marker_file' => file_exists($installer->getMarkerFile()),
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
