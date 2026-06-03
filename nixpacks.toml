@@ -14,11 +14,13 @@
 providers = ["php"]
 
 # ====================
-# 安装阶段：明确安装 PHP + Composer
-# providers = ["php"] 不会自动加包，必须在 setup 阶段显式指定
+# 安装阶段：明确安装 PHP + Composer + nodejs
+# providers = ["php"] 默认生成的 start 命令会调 node 处理 nginx 模板，
+# 所以即使我们想用 php -S，也必须装 node，否则 start 阶段会报
+# "node: command not found"，容器直接退出，Traefik 返回 502。
 # ====================
 [phases.setup]
-nixPkgs = ["php82", "php82Packages.composer"]
+nixPkgs = ["php82", "php82Packages.composer", "nginx", "nodejs"]
 
 # ====================
 # 安装阶段：覆盖默认的 npm ci
