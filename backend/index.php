@@ -319,10 +319,19 @@ try {
     
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
-    
+
 } catch (Exception $e) {
-    error_log("API Error: " . $e->getMessage());
-    apiServerError('服务器内部错误');
+    error_log("API Error: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+    // 调试阶段：把 detail 透传，便于排查；正式上线时把 detail 改成 false
+    $detail = get_class($e) . ': ' . $e->getMessage() . ' at ' . basename($e->getFile()) . ':' . $e->getLine();
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'success' => false,
+        'error' => '服务器内部错误',
+        'detail' => $detail,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 } finally {
     // 记录请求日志
     $requestEndTime = microtime(true);
