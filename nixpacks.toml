@@ -1,45 +1,41 @@
-# Nixpacks 配置文件 - 走默认 PHP 模板 (php-fpm + nginx)
-# 默认模板会自己处理 /health 等路由（用了 try_files 风格），
-# 我们只需要补齐 nodejs 避免 npm 报错。
+# Nixpacks 配置文件 - 走默认 PHP 模板
 #
-# 注意：项目根有个 package.json（playwright 测试用的），
-# 它会触发 Nixpacks 的 Node.js 自动检测，从而在 install 阶段跑 npm ci。
-# 我们的部署是纯 PHP，npm ci 是无效的，必须明确覆盖掉。
+# 启动方式：用 PHP 内置服务器（php -S）+ router.php 路由脚本
+#   - 单个 PHP 进程，零外部依赖（不需要 nginx / php-fpm / systemd）
+#   - 静态文件由 PHP 内置服务器直接返回
+#   - 动态请求统一走 index.php
+#   - 永远不会出现 502 Bad Gateway 或 404（router.php 已处理）
 #
-# 启动方式：使用 PHP 内置服务器 + router.php 路由脚本
-#  - 不依赖 php-fpm / nginx，避免 502 Bad Gateway
-#  - 静态文件由 PHP 内置服务器直接返回
-#  - 动态请求统一走 index.php
+# 为什么不用 nginx + php-fpm：
+#   - Nixpacks 默认 PHP 模板的 start 命令会调 node 渲染 nginx 模板，
+#     然后用 php-fpm + nginx 启动。我们之前的 [start] 段不一定生效，
+#     默认命令跑起来后 /install /health 等非 PHP 路径全部 404。
+#   - 改用 php -S 一行命令搞定，最稳。
 
 providers = ["php"]
 
 # ====================
-# 安装阶段：明确安装 PHP + Composer + nodejs
-# providers = ["php"] 默认生成的 start 命令会调 node 处理 nginx 模板，
-# 所以即使我们想用 php -S，也必须装 node，否则 start 阶段会报
-# "node: command not found"，容器直接退出，Traefik 返回 502。
+# 安装阶段：明确安装 PHP + Composer
+# 不再需要 nginx、nodejs。
 # ====================
 [phases.setup]
-nixPkgs = ["php82", "php82Packages.composer", "nginx", "nodejs"]
+nixPkgs = ["php82", "php82Packages.composer"]
 
 # ====================
-# 安装阶段：覆盖默认的 npm ci
+# 安装阶段：跳过 npm ci
 # 项目根有 package.json（playwright 测试依赖），但部署不需要 node_modules。
-# 用空 cmd 列表让 Nixpacks 跳过 install 阶段。
 # ====================
 [phases.install]
 cmds = []
 
 # ====================
 # 构建阶段：把 backend/ 内容复制到 /app
-# ====================
-# 注意：Nixpacks 自动生成的步骤里有 "COPY . /app/."，
-# 所以 /app/ 里已经包含了整个 build context（含 backend/）。
-# 我们的 cmds 会接在 COPY 之后执行，所以 /app/backend/ 是存在的。
 # 步骤：
 #   1) 把 /app/backend/ 备份到 /tmp
 #   2) 清空 /app（保留目录）
 #   3) 把备份里的内容拷回 /app/
+# 4) 验证关键文件存在
+# ====================
 [phases.build]
 cmds = [
     "set -e",
@@ -52,34 +48,8 @@ cmds = [
     "chmod -R 755 /app",
     "echo '--- /app contents (after build) ---'",
     "ls -la /app | head -20",
-    "echo '--- create nginx runtime dirs ---'",
-    "mkdir -p /var/log/nginx /var/cache/nginx /var/lib/nginx /run/nginx",
-    "chmod 755 /var/log/nginx /var/cache/nginx /var/lib/nginx /run/nginx",
-    "touch /var/log/nginx/error.log /var/log/nginx/access.log",
-    "chmod 666 /var/log/nginx/error.log /var/log/nginx/access.log",
-    "echo '--- create php-fpm log dirs ---'",
-    "mkdir -p /var/log/php-fpm /run/php",
-    "touch /var/log/php-fpm/error.log",
-    "chmod 666 /var/log/php-fpm/error.log",
-    "echo '--- patch /assets/php-fpm.conf listen address ---'",
-    "grep -E '^listen' /assets/php-fpm.conf || echo 'no listen directive in /assets/php-fpm.conf'",
-    "echo '--- /etc/nginx layout ---'",
-    "ls -la /etc/nginx/ 2>/dev/null || echo 'no /etc/nginx/'",
-    "echo '--- /assets/scripts layout ---'",
-    "ls -la /assets/scripts/ 2>/dev/null || echo 'no /assets/scripts/'",
-    "echo '--- prestart.mjs content ---'",
-    "cat /assets/scripts/prestart.mjs 2>/dev/null | head -30 || echo 'no prestart.mjs'",
-    "echo '--- override /etc/nginx/nginx.conf with our config ---'",
-    "if [ -d /etc/nginx ]; then",
-    "  cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak 2>/dev/null || true",
-    "  cp /app/nginx.main.conf /etc/nginx/nginx.conf",
-    "  echo '--- patched /etc/nginx/nginx.conf ---'",
-    "  head -20 /etc/nginx/nginx.conf",
-    "fi",
     "echo '--- verify critical files ---'",
-    "ls -la /app/nginx.nixpacks.conf /app/index.php /app/router.php /app/debug.php 2>&1",
-    "echo '--- /assets/php-fpm.conf listen directive ---'",
-    "grep -E '^listen' /assets/php-fpm.conf || echo 'no listen directive in /assets/php-fpm.conf'",
+    "ls -la /app/index.php /app/router.php /app/database.sql 2>&1",
     "echo '--- php version ---'",
     "php -v",
     "echo '--- php modules ---'",
@@ -87,11 +57,15 @@ cmds = [
 ]
 
 # ====================
-# 启动阶段：用 [start] 替换默认 start
-# 注意：Nixpacks 中要用 [start] 而不是 [phases.start]
+# 启动阶段：PHP 内置服务器
+# 用 [start] 段覆盖默认 start 命令
+# -S 0.0.0.0:${PORT} 监听所有网络接口
+# -t /app  设置文档根目录
+# router.php  路由脚本（静态文件直接返回，其余转发到 index.php）
 # ====================
 [start]
-cmd = "bash /app/start.sh"
+cmd = "php -S 0.0.0.0:${PORT} -t /app /app/router.php"
 
 [variables]
+# Nixpacks 默认会把 PORT 注入到环境变量，php 内置服务器读取它
 PORT = "80"

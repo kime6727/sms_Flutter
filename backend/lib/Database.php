@@ -47,7 +47,11 @@ class Database {
                     if (!file_exists($caPath)) {
                         $pem = $caContent;
                         if (strpos($pem, '-----BEGIN') === false) {
-                            $pem = base64_decode($caContent);
+                            $pem = base64_decode($pem);
+                            if ($pem === false || strpos($pem, '-----BEGIN') === false) {
+                                // 解码失败 → 当作原始 PEM 写
+                                $pem = $caContent;
+                            }
                         }
                         @file_put_contents($caPath, $pem);
                         @chmod($caPath, 0600);
@@ -55,7 +59,8 @@ class Database {
                 }
 
                 // 2. 兜底：CA 路径无效时（文件不存在或为空），自动用系统 CA bundle
-                if ($caPath && (!file_exists($caPath) || filesize($caPath) < 100)) {
+                $caFound = $caPath && file_exists($caPath) && filesize($caPath) > 100;
+                if ($caPath && !$caFound) {
                     $systemCas = [
                         '/etc/ssl/certs/ca-certificates.crt',  // Debian/Ubuntu
                         '/etc/pki/tls/certs/ca-bundle.crt',    // CentOS/RHEL
@@ -65,29 +70,50 @@ class Database {
                         if (file_exists($cand) && filesize($cand) > 100) {
                             error_log("[DB] CA file {$caPath} missing/empty, fallback to {$cand}");
                             $caPath = $cand;
+                            $caFound = true;
                             break;
                         }
                     }
                 }
 
                 // 3. SSL 标志
-                if ($caPath && $verify) {
+                if ($caFound && $verify) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $caPath;
                     if (defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
                         $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
                     }
                 }
                 // 若 verify=false 且 ca 存在，仍要带 CA 文件但不强制校验
-                elseif ($caPath) {
+                elseif ($caFound) {
                     $options[PDO::MYSQL_ATTR_SSL_CA] = $caPath;
                 }
-                // 若没传 ca 但 enabled=true，至少声明我们要用 SSL（仍要服务端允许）
-                elseif (defined('DB_SSL_ENABLED') && DB_SSL_ENABLED) {
-                    // 什么都不传：让 PDO 走默认加密，不验证证书
+                // 若没找到 ca 但 enabled=true：不传任何 SSL 选项，
+                // 让 PDO 走默认协商（多数 MySQL 服务在没要求严格校验时仍可连接）
+                // 第一次连不上会在 catch 里被记录，用户可选择禁用 SSL
+                else {
+                    error_log("[DB] SSL enabled but no CA available, attempting connection without SSL verify");
                 }
             }
 
-            $this->pdo = new PDO($dsn, $user, $pass, $options);
+            try {
+                $this->pdo = new PDO($dsn, $user, $pass, $options);
+            } catch (PDOException $e) {
+                // 如果是 SSL 握手错误且当前 enabled=true，则降级为非 SSL 重试
+                $msg = $e->getMessage();
+                $sslRelated = stripos($msg, 'ssl') !== false || stripos($msg, 'certificate') !== false;
+                if ($sslRelated && defined('DB_SSL_ENABLED') && DB_SSL_ENABLED) {
+                    error_log("[DB] SSL connect failed, retrying without SSL: " . $msg);
+                    // 清掉所有 SSL 选项，重试
+                    $options2 = [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_EMULATE_PREPARES => false,
+                    ];
+                    $this->pdo = new PDO($dsn, $user, $pass, $options2);
+                    return;
+                }
+                throw $e;
+            }
         } catch (PDOException $e) {
             // 详细错误日志（便于排查 SSL/网络问题）
             error_log("[DB] connect failed: host={$host} port={$port} db={$db} user={$user} ssl_enabled=" . (defined('DB_SSL_ENABLED') ? 'yes' : 'no'));
