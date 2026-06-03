@@ -157,8 +157,27 @@ if (strpos($path, '/') !== 0) {
     $path = '/' . $path;
 }
 
+// WordPress 风格自安装：
+//   - 数据库连上后，先检查是否已初始化（admins 表是否存在）
+//   - 没初始化但用户访问 /install* 路径：继续走（让 install 路由处理）
+//   - 没初始化且访问其它路径：返回 503 引导用户访问 /install
+$installer = new Installer();
+$_installReady = $installer->checkDatabase($db);
+if (!$_installReady && !preg_match('#^/install(/.*)?$#', $path)) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(503);
+    echo json_encode([
+        'success' => false,
+        'error' => 'database_not_initialized',
+        'message' => '数据库未初始化，请访问 /install 完成首次安装',
+        'install_url' => '/install',
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+unset($installer);
+
 // API Key 验证中间件
-$publicPaths = ['/health', '/banners', '/settings', '/auth/password-login', '/auth/manual-register', '/auth/forgot-password', '/auth/reset-password'];
+$publicPaths = ['/health', '/banners', '/settings', '/auth/password-login', '/auth/manual-register', '/auth/forgot-password', '/auth/reset-password', '/install', '/install/status', '/install/run'];
 $isPublicPath = in_array($path, $publicPaths);
 
 // 检查是否需要 API Key 验证（公开路径不需要）
@@ -189,6 +208,7 @@ try {
     require_once __DIR__ . '/routes/notifications.php';
     require_once __DIR__ . '/routes/payment.php';
     require_once __DIR__ . '/routes/system.php';
+    require_once __DIR__ . '/routes/install.php';
     
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
