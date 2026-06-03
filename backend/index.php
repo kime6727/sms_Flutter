@@ -18,6 +18,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// ====================
+// 全局异常处理：让 500 错误能看到具体原因
+// ====================
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
+set_exception_handler(function ($e) {
+    $msg = $e->getMessage();
+    $file = $e->getFile();
+    $line = $e->getLine();
+    error_log("[uncaught] " . get_class($e) . ": " . $msg . " at $file:$line");
+    $detail = get_class($e) . ": " . $msg . " at " . basename($file) . ":" . $line;
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode([
+        'success' => false,
+        'error' => '服务器内部错误',
+        'detail' => $detail,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) return false;
+    error_log("[php error] $message at $file:$line");
+    return false;
+});
+
 // 加载配置
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/config/constants.php';
