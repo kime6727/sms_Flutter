@@ -626,9 +626,10 @@ CREATE TABLE IF NOT EXISTS `banners` (
 -- ============================================
 
 -- 1. 添加 Google/Apple 登录支持字段
+-- MySQL 8.0+ 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS，依赖 Installer 跳过 Duplicate column name
 ALTER TABLE users 
-  ADD COLUMN IF NOT EXISTS google_id varchar(255) DEFAULT NULL COMMENT 'Google账号ID' AFTER email,
-  ADD COLUMN IF NOT EXISTS apple_id varchar(255) DEFAULT NULL COMMENT 'Apple账号ID' AFTER google_id;
+  ADD COLUMN google_id varchar(255) DEFAULT NULL COMMENT 'Google账号ID' AFTER email,
+  ADD COLUMN apple_id varchar(255) DEFAULT NULL COMMENT 'Apple账号ID' AFTER google_id;
 
 -- 2. 为 Google/Apple ID 添加唯一索引（如果不存在）
 -- MySQL 5.7 不支持 IF NOT EXISTS，需要先检查
