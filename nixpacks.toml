@@ -72,15 +72,15 @@ cmds = [
 ]
 
 # ====================
-# 启动阶段：用我们自己的 nginx 配置（已含 try_files 路由），
-# 跳过 Nixpacks 的 prestart.mjs（它用的默认模板不路由到 index.php）
+# 启动阶段：用我们自己的 start.sh 脚本
+# 脚本里：
+#   1. 后台启动 php-fpm
+#   2. 用我们自己的 nginx 配置（包含 try_files /index.php）
+#   3. 前台启动 nginx
+# 不用 Nixpacks 默认的 prestart.mjs（默认模板不路由到 index.php）
 # ====================
-# 关键点：
-#   1. 用我们自己的 nginx.nixpacks.conf（已经包含 try_files /index.php）
-#   2. 不用 prestart（默认模板不路由到 index.php）
-#   3. php-fpm 监听 127.0.0.1:9000（Nixpacks 默认值）
 [phases.start]
-cmd = "php-fpm -y /assets/php-fpm.conf >/var/log/php-fpm.log 2>&1 & sleep 2 && nginx -c /app/nginx.nixpacks.conf -g 'daemon off;'"
+cmd = "bash /app/start.sh"
 
 [variables]
 PORT = "80"
