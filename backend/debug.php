@@ -15,6 +15,33 @@
 
 header('Content-Type: text/plain; charset=utf-8');
 
+// ====================
+// nginx 配置探测（放在最前面，确保能看到）
+// ====================
+echo "=== nginx Config Probe (FIRST) ===\n";
+$candidates = [
+    '/etc/nginx/nginx.conf',
+    '/nginx.conf',
+    '/app/nginx.conf',
+    '/app/nginx.nixpacks.conf',
+    '/app/nginx.main.conf',
+];
+foreach ($candidates as $c) {
+    echo "  $c: " . (file_exists($c) ? 'EXISTS' : 'NO') . "\n";
+    if (file_exists($c) && is_readable($c)) {
+        echo "  --- first 40 lines ---\n";
+        $lines = file($c);
+        foreach (array_slice($lines, 0, 40) as $i => $line) {
+            echo "  " . sprintf('%2d', $i+1) . ": " . rtrim($line) . "\n";
+        }
+    }
+}
+echo "=== /proc/1/cmdline ===\n";
+echo @file_get_contents('/proc/1/cmdline') ?: 'N/A';
+echo "\n=== /proc/1/cmdline hex ===\n";
+echo bin2hex(@file_get_contents('/proc/1/cmdline') ?: '');
+echo "\n=== END FIRST ===\n\n";
+
 echo "=== PHP Info ===\n";
 echo "PHP Version: " . PHP_VERSION . "\n";
 echo "SAPI: " . PHP_SAPI . "\n";
