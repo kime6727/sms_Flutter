@@ -563,8 +563,8 @@ CREATE INDEX idx_orders_created ON orders(created_at DESC);
 
 -- 服务国家关联优化
 CREATE INDEX idx_sc_service_country ON service_countries(service_id, country_id);
-CREATE INDEX idx_sc_published ON service_countries(is_published, active);
-CREATE INDEX idx_sc_service_published ON service_countries(service_id, is_published, active);
+CREATE INDEX idx_sc_published ON service_countries(is_published, is_active);
+CREATE INDEX idx_sc_service_published ON service_countries(service_id, is_published, is_active);
 
 -- 通知查询优化
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, read_at);
@@ -586,7 +586,7 @@ CREATE INDEX idx_credit_user_created ON credit_transactions(user_id, created_at 
 CREATE INDEX idx_sms_order ON sms_messages(order_id, received_at DESC);
 
 -- 服务优化
-CREATE INDEX idx_services_published ON services(is_published, active, sort_order);
+CREATE INDEX idx_services_published ON services(is_published, is_active, sort_order);
 CREATE INDEX idx_services_code ON services(code);
 
 -- 国家优化
