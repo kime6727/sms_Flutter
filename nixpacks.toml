@@ -87,11 +87,11 @@ cmds = [
 ]
 
 # ====================
-# 启动阶段：使用 Nixpacks 默认 start 命令
-# 默认 start 会跑 prestart.mjs 处理 /assets/nginx.template.conf
-# 我们在 build 阶段把 nginx.template.conf 替换成了我们自己的版本
-# （包含 try_files /index.php），这样 /health /install 就能正确路由
+# 启动阶段：用 [start] 替换默认 start
+# 注意：Nixpacks 中要用 [start] 而不是 [phases.start]
 # ====================
+[start]
+cmd = "bash /app/start.sh"
 
 [variables]
 PORT = "80"
