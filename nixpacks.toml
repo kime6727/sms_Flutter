@@ -72,14 +72,10 @@ cmds = [
 ]
 
 # ====================
-# 启动阶段：用我们自己的 start.sh 脚本
-# 脚本里：
-#   1. 后台启动 php-fpm
-#   2. 用我们自己的 nginx 配置（包含 try_files /index.php）
-#   3. 前台启动 nginx
-# 不用 Nixpacks 默认的 prestart.mjs（默认模板不路由到 index.php）
+# 启动阶段：替换 Nixpacks 默认的 start（不用 prestart.mjs）
+# 关键：顶层 cmd = "..." 才会真正替换默认 start 命令
+# [phases.start] 是追加，不是替换
 # ====================
-[phases.start]
 cmd = "bash /app/start.sh"
 
 [variables]
