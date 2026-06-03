@@ -64,11 +64,12 @@ class Installer
 
     /**
      * 深度检查 - 实际探测数据库（标记文件可能丢失/被删）
+     * 用 SELECT 而不是 SHOW TABLES，因为 SHOW 对 prepared statement 不友好
      */
     public function checkDatabase($db)
     {
         try {
-            $row = $db->query("SHOW TABLES LIKE ?", [$this->markerTable])->fetch();
+            $row = $db->query("SELECT 1 FROM `" . $this->markerTable . "` LIMIT 1")->fetch();
             if ($row) {
                 $this->markInstalled();
                 return true;
