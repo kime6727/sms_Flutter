@@ -6,19 +6,11 @@ providers = ["php"]
 # ====================
 # 安装阶段
 # ====================
+# nixpkgs 的 php82 已经内置 pdo_mysql / mysqli / bcmath / curl / mbstring /
+# openssl / pdo / xml / zip 等常用扩展，无需单独指定 xxx-bcmath 这种包。
+# nix 中 PHP 扩展包不存在独立名字（早期 php72-bcmath 命名已废弃）。
 [phases.setup]
-nixPkgs = [
-    "php82",
-    "php82-pdo",
-    "php82-pdo_mysql",
-    "php82-mysqli",
-    "php82-bcmath",
-    "php82-curl",
-    "php82-mbstring",
-    "php82-xml",
-    "php82-zip",
-    "php82-openssl",
-]
+nixPkgs = ["php82", "nginx"]
 
 # ====================
 # 构建阶段：把 backend/ 内容复制到 /app
@@ -29,8 +21,12 @@ cmds = [
     "mkdir -p /app",
     "cp -r backend/. /app/",
     "chmod -R 755 /app",
-    "ls -la /app | head -10",
+    "echo '--- /app contents ---'",
+    "ls -la /app | head -20",
+    "echo '--- php version ---'",
     "php -v",
+    "echo '--- php modules ---'",
+    "php -m | grep -iE 'pdo|mysql|bcmath|curl|mbstring|openssl|xml|zip'",
 ]
 
 # ====================
