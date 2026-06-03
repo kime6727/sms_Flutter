@@ -23,14 +23,28 @@ cmds = []
 # ====================
 # 构建阶段：把 backend/ 内容复制到 /app
 # ====================
+# 注意：Nixpacks 自动生成的步骤里有 "COPY . /app/."，
+# 所以 /app/ 里已经包含了整个 build context（含 backend/）。
+# 我们的 cmds 会接在 COPY 之后执行，所以 /app/backend/ 是存在的。
+# 步骤：
+#   1) 把 /app/backend/ 备份到 /tmp
+#   2) 清空 /app（保留目录）
+#   3) 把备份里的内容拷回 /app/
 [phases.build]
 cmds = [
-    "rm -rf /app",
-    "mkdir -p /app",
-    "cp -r backend/. /app/",
+    "set -e",
+    "echo '--- before cleanup: /app contents ---'",
+    "ls -la /app | head -20",
+    "cp -r /app/backend /tmp/_sms_backend",
+    "rm -rf /app && mkdir -p /app",
+    "cp -r /tmp/_sms_backend/. /app/",
+    "rm -rf /tmp/_sms_backend",
     "chmod -R 755 /app",
-    "ls -la /app | head -10",
+    "echo '--- /app contents (after build) ---'",
+    "ls -la /app | head -20",
+    "echo '--- php version ---'",
     "php -v",
+    "echo '--- php modules ---'",
     "php -m | grep -iE 'pdo|mysql|bcmath|curl|mbstring|openssl|xml|zip' || true",
 ]
 
