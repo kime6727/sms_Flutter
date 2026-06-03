@@ -4,6 +4,22 @@
 
 set -e
 
+echo "[entrypoint] starting at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+# 验证关键文件存在
+if [ ! -f /app/index.php ]; then
+    echo "[entrypoint] FATAL: /app/index.php not found!" >&2
+    echo "[entrypoint] /app contents:" >&2
+    ls -la /app 2>&1 | head -20 >&2
+    exit 1
+fi
+
+if [ ! -f /etc/nginx/conf.d/default.conf ]; then
+    echo "[entrypoint] FATAL: nginx config not found!" >&2
+    ls -la /etc/nginx/conf.d/ >&2
+    exit 1
+fi
+
 # PHP 上传/执行配置（如果未挂载自定义 ini）
 if [ ! -f /usr/local/etc/php/conf.d/zz-app.ini ]; then
     cat > /usr/local/etc/php/conf.d/zz-app.ini <<EOF
@@ -18,17 +34,32 @@ log_errors = On
 EOF
 fi
 
-# 如果 backend 目录存在且不为空，把 /app 指向它
-if [ -d /var/www/backend ] && [ "$(ls -A /var/www/backend 2>/dev/null)" ]; then
-    # 软链接 /app -> /var/www/backend，方便 nginx 走固定路径
-    if [ ! -e /app ]; then
-        ln -s /var/www/backend /app
-    fi
-fi
-
-# 启动 php-fpm 后台
+# 启动 php-fpm（后台）
 mkdir -p /run/php
+echo "[entrypoint] starting php-fpm..."
 php-fpm -D
 
-# 启动 nginx 前台
-nginx -g 'daemon off;'
+# 等 php-fpm 起来
+sleep 1
+
+# 验证 php-fpm 监听 9000
+if (echo > /dev/tcp/127.0.0.1/9000) 2>/dev/null; then
+    echo "[entrypoint] php-fpm listening on 127.0.0.1:9000 ✓"
+else
+    echo "[entrypoint] WARNING: php-fpm NOT listening on 127.0.0.1:9000" >&2
+    echo "[entrypoint] php-fpm config listen line:" >&2
+    grep -h "^listen" /usr/local/etc/php-fpm.d/*.conf >&2
+fi
+
+# 验证 nginx 配置
+echo "[entrypoint] testing nginx config..."
+if nginx -t 2>&1; then
+    echo "[entrypoint] nginx config OK ✓"
+else
+    echo "[entrypoint] FATAL: nginx config test failed" >&2
+    exit 1
+fi
+
+# 启动 nginx（前台）
+echo "[entrypoint] starting nginx..."
+exec nginx -g 'daemon off;'
