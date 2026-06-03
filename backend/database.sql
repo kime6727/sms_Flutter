@@ -183,6 +183,9 @@ CREATE TABLE IF NOT EXISTS `orders` (
   `quantity` int DEFAULT '1',
   `price` decimal(10,2) DEFAULT '0.00',
   `total_cost` decimal(10,2) DEFAULT '0.00',
+  `total_price` decimal(10,2) DEFAULT '0.00' COMMENT '总售价（用户支付）',
+  `cost_price` decimal(10,2) DEFAULT '0.00' COMMENT '成本价（hero-sms 提供）',
+  `profit` decimal(10,2) DEFAULT '0.00' COMMENT '利润',
   `status` varchar(20) DEFAULT 'pending',
   `phone_number` varchar(20) DEFAULT NULL,
   `service_name` varchar(255) DEFAULT NULL,
@@ -626,6 +629,12 @@ CREATE TABLE IF NOT EXISTS `banners` (
 -- 适用于 MySQL 5.7.44
 -- 执行日期: 2026-05-16
 -- ============================================
+
+-- 0. 添加 orders 表缺字段（total_price / cost_price / profit，订单业务用到）
+ALTER TABLE orders
+  ADD COLUMN total_price decimal(10,2) DEFAULT '0.00' COMMENT '总售价（用户支付）',
+  ADD COLUMN cost_price decimal(10,2) DEFAULT '0.00' COMMENT '成本价（hero-sms 提供）',
+  ADD COLUMN profit decimal(10,2) DEFAULT '0.00' COMMENT '利润';
 
 -- 0. 添加 total_spent / order_count 字段（密码登录 / 订单查询用到）
 -- MySQL 8.0+ 不支持 ALTER TABLE ADD COLUMN IF NOT EXISTS，依赖 Installer 跳过 Duplicate column name
