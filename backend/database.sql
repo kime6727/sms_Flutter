@@ -679,7 +679,7 @@ SET @index_exists3 = (
 SELECT IF(@index_exists3 > 0, '索引已存在', '索引不存在，请手动添加') AS result;
 
 -- 5. 确保系统设置中有注册奖励配置
-INSERT IGNORE INTO system_settings (`key`, value, type, description, created_at) VALUES
+INSERT IGNORE INTO system_settings (`key`, value, type, description, updated_at) VALUES
 ('register_bonus_min', '5', 'string', '注册赠送积分最小值', NOW()),
 ('register_bonus_max', '10', 'string', '注册赠送积分最大值', NOW());
 
