@@ -1,0 +1,46 @@
+# Nixpacks 配置文件
+# 显式声明 PHP，避免 Nixpacks 误判为 Node.js
+
+providers = ["php"]
+
+# ====================
+# 安装阶段
+# ====================
+[phases.setup]
+nixPkgs = [
+    "php82",
+    "php82-pdo",
+    "php82-pdo_mysql",
+    "php82-mysqli",
+    "php82-bcmath",
+    "php82-curl",
+    "php82-mbstring",
+    "php82-xml",
+    "php82-zip",
+    "php82-openssl",
+]
+
+# ====================
+# 构建阶段：把 backend/ 内容复制到 /app
+# ====================
+[phases.build]
+cmds = [
+    "rm -rf /app",
+    "mkdir -p /app",
+    "cp -r backend/. /app/",
+    "chmod -R 755 /app",
+    "ls -la /app | head -10",
+    "php -v",
+]
+
+# ====================
+# 启动阶段：php 内置服务器
+# ====================
+# PHP 7.4+ 内置服务器会自动把未匹配的文件请求路由到 index.php，
+# 这正好替代了 nginx 的 try_files 规则，
+# 解决 /health /api/health 等路径 404 的问题。
+[phases.start]
+cmd = "php -S 0.0.0.0:${PORT:-80} -t /app"
+
+[variables]
+PORT = "80"
