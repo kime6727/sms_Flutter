@@ -66,17 +66,27 @@ if ($path === '/sync' && $method === 'POST') {
             $list = $heroSMS->getCountries();
             if (!empty($list['countries'])) {
                 foreach ($list['countries'] as $id => $info) {
+                    // HeroSMS API 实际返回字段: rus / eng / chn
+                    // 我们用 eng 作为默认 name，chn 作为 name_cn，rus 作为 name
+                    $engName = is_array($info) ? ($info['eng'] ?? '') : '';
+                    $rusName = is_array($info) ? ($info['rus'] ?? '') : '';
+                    $chnName = is_array($info) ? ($info['chn'] ?? '') : '';
+                    $heroCountryId = is_array($info) ? ($info['id'] ?? $id) : $id;
+                    $displayName = $chnName ?: $engName ?: $rusName ?: ('Country_' . $id);
+
                     // hero_country_id 才是去重依据（uk_hero_country_id 唯一键）
                     // id 是自增主键，不要手动指定
                     $db->query(
-                        "INSERT INTO countries (hero_country_id, name, code, active, sort_order, created_at, updated_at)
-                         VALUES (?, ?, ?, 1, 0, NOW(), NOW())
+                        "INSERT INTO countries (hero_country_id, name, name_en, name_cn, code, active, sort_order, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, 1, 0, NOW(), NOW())
                          ON DUPLICATE KEY UPDATE
                            name = VALUES(name),
+                           name_en = VALUES(name_en),
+                           name_cn = VALUES(name_cn),
                            code = VALUES(code),
                            active = 1,
                            updated_at = NOW()",
-                        [(string)$id, $info['name'] ?? '', strtolower($info['code'] ?? '')]
+                        [(string)$heroCountryId, $displayName, $engName, $chnName, strtolower($engName)]
                     );
                 }
                 $synced['countries'] = count($list['countries']);
