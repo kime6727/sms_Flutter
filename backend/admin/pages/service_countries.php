@@ -209,17 +209,31 @@ try {
 }
 ?>
 
+<?php
+// 当前服务图标（顶部展示用）
+$curSvcId = $service['hero_service_id'] ?? '';
+$curSvcIconCdn  = $curSvcId ? "https://cdn.hero-sms.com/assets/img/service/{$curSvcId}0.webp" : '';
+$curSvcIconPath = $curSvcId ? "../../pic/fuwu/{$curSvcId}0.webp" : '';
+$curSvcInitial  = strtoupper(substr($service['name_en'] ?? $service['name'] ?? $curSvcId, 0, 2));
+?>
+
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
-    <div>
-        <a href="?page=services" style="color:#6366f1;text-decoration:none;font-size:14px;">← 返回服务列表</a>
-        <h4 style="margin:8px 0 0 0;">🌍 <?= htmlspecialchars($service['name_cn'] ?: $service['name_en'] ?: $service['name']) ?> - 国家配置</h4>
-        <div style="font-size:13px;color:#64748b;margin-top:4px;">
-            HeroID: <code><?= htmlspecialchars($service['hero_service_id']) ?></code>
-            <?php if($service['is_published']): ?>
-                · <span style="color:#10b981;">✓ 已上架</span>
-            <?php else: ?>
-                · <span style="color:#ef4444;">✗ 已下架</span>
-            <?php endif; ?>
+    <div style="display:flex;align-items:center;gap:14px;">
+        <img src="<?= htmlspecialchars($curSvcIconCdn) ?>"
+             onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='<?= htmlspecialchars($curSvcIconPath) ?>';}else{this.onerror=null;this.outerHTML='<div style=\'width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;\'><?= htmlspecialchars($curSvcInitial) ?></div>';}"
+             style="width:56px;height:56px;border-radius:10px;object-fit:contain;background:#f8fafc;flex-shrink:0;"
+             loading="lazy">
+        <div>
+            <a href="?page=services" style="color:#6366f1;text-decoration:none;font-size:13px;">← 返回服务列表</a>
+            <h4 style="margin:6px 0 0 0;">🌍 <?= htmlspecialchars($service['name_cn'] ?: $service['name_en'] ?: $service['name']) ?> - 国家配置</h4>
+            <div style="font-size:13px;color:#64748b;margin-top:4px;">
+                HeroID: <code><?= htmlspecialchars($curSvcId) ?></code>
+                <?php if($service['is_published']): ?>
+                    · <span style="color:#10b981;">✓ 已上架</span>
+                <?php else: ?>
+                    · <span style="color:#ef4444;">✗ 已下架</span>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -325,12 +339,26 @@ try {
             <?php else: foreach($rows as $r):
                 $unitPoints = bcmul((string)$r['price'], (string)($r['coefficient'] ?: 1), 4);
                 $unitPointsDisplay = bcmul($unitPoints, '100', 0);
+                // 国家旗帜：用 hero_country_id 拼 {id}.svg，三级降级 CDN → 本地 → emoji
+                $flagHeroId = $r['hero_country_id'] ?? '';
+                $flagCdn  = $flagHeroId !== '' ? "https://cdn.hero-sms.com/assets/img/country/{$flagHeroId}.svg" : '';
+                $flagPath = $flagHeroId !== '' ? "../../pic/country/{$flagHeroId}.svg" : '';
+                $flagInitial = strtoupper(substr($r['code'] ?? $r['country_code'] ?? $flagHeroId, 0, 2));
             ?>
             <tr style="<?= !$r['is_published'] ? 'opacity:0.5;' : '' ?>" data-id="<?= $r['id'] ?>">
                 <td><input type="checkbox" class="row-cb" value="<?= $r['id'] ?>"></td>
                 <td>
-                    <div style="font-weight:500;"><?= htmlspecialchars($r['name_cn'] ?: $r['name_en'] ?: $r['name']) ?></div>
-                    <div style="font-size:11px;color:#94a3b8;"><?= htmlspecialchars($r['name_en'] ?? '') ?></div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <img src="<?= htmlspecialchars($flagCdn) ?>"
+                             onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='<?= htmlspecialchars($flagPath) ?>';}else{this.onerror=null;this.outerHTML='<div style=\'width:28px;height:20px;border-radius:4px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;\'><?= htmlspecialchars($flagInitial) ?></div>';}"
+                             style="width:28px;height:20px;border-radius:4px;object-fit:contain;background:#f8fafc;flex-shrink:0;"
+                             loading="lazy"
+                             title="<?= htmlspecialchars($r['name_en'] ?? $r['name'] ?? '') ?>">
+                        <div>
+                            <div style="font-weight:500;"><?= htmlspecialchars($r['name_cn'] ?: $r['name_en'] ?: $r['name']) ?></div>
+                            <div style="font-size:11px;color:#94a3b8;"><?= htmlspecialchars($r['name_en'] ?? '') ?></div>
+                        </div>
+                    </div>
                 </td>
                 <td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;"><?= htmlspecialchars($r['hero_country_id']) ?></code></td>
                 <td style="text-align:right;font-family:monospace;">

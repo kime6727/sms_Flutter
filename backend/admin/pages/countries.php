@@ -225,28 +225,21 @@ $withServices = $db->query(
                 </td>
             </tr>
             <?php else: ?>
-            <?php foreach($countries as $country): ?>
+            <?php foreach($countries as $country):
+                $flagHeroId = $country['hero_country_id'] ?? '';
+                $flagCdn  = $flagHeroId !== '' ? "https://cdn.hero-sms.com/assets/img/country/{$flagHeroId}.svg" : '';
+                $flagPath = $flagHeroId !== '' ? "../../pic/country/{$flagHeroId}.svg" : '';
+                $flagInitial = strtoupper(substr($country['code'] ?? $flagHeroId, 0, 2));
+            ?>
             <tr style="<?= !$country['active'] ? 'opacity:0.5;' : '' ?>">
                 <td style="color:#64748b;"><?= $country['id'] ?></td>
                 <td><small style="color:#64748b;background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;"><?= htmlspecialchars($country['hero_country_id']) ?></small></td>
                 <td>
-                    <?php
-                    $flagUrl = '';
-                    if (!empty($country['flag'])) {
-                        $cdnBase = 'https://cdn.hero-sms.com/assets/img/country/';
-                        if (strpos($country['flag'], $cdnBase) === 0) {
-                            $filename = substr($country['flag'], strlen($cdnBase));
-                            $flagUrl = '../../pic/country/' . htmlspecialchars($filename);
-                        } elseif (strpos($country['flag'], '/pic/country/') !== false) {
-                            $flagUrl = htmlspecialchars($country['flag']);
-                        }
-                    }
-                    ?>
-                    <?php if(!empty($flagUrl)): ?>
-                    <img src="<?= $flagUrl ?>" style="width:28px;height:20px;border-radius:4px;object-fit:contain;" onerror="this.parentElement.textContent='🏳️'">
-                    <?php else: ?>
-                    🏳️
-                    <?php endif; ?>
+                    <img src="<?= htmlspecialchars($flagCdn) ?>"
+                         onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='<?= htmlspecialchars($flagPath) ?>';}else{this.onerror=null;this.outerHTML='<div style=\'width:28px;height:20px;border-radius:4px;background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;\'><?= htmlspecialchars($flagInitial) ?></div>';}"
+                         style="width:28px;height:20px;border-radius:4px;object-fit:contain;background:#f8fafc;"
+                         loading="lazy"
+                         title="<?= htmlspecialchars($country['name_en'] ?? $country['name'] ?? '') ?>">
                 </td>
                 <td>
                     <div style="font-weight:500;"><?= htmlspecialchars($country['name']) ?></div>

@@ -402,12 +402,27 @@ $msg = $_GET['msg'] ?? '';
                 <div style="font-size:13px;">点击右上角「同步 HeroSMS」获取服务列表</div>
             </td></tr>
             <?php else: foreach($services as $s): ?>
+            <?php
+            // HeroSMS 服务图标：远端 https://cdn.hero-sms.com/assets/img/service/{id}0.webp
+            // 本地 pic/fuwu/{id}0.webp，三级降级：CDN → 本地 → 文字
+            $svcId = $s['hero_service_id'] ?? '';
+            $svcIconCdn  = $svcId ? "https://cdn.hero-sms.com/assets/img/service/{$svcId}0.webp" : '';
+            $svcIconPath = $svcId ? "../../pic/fuwu/{$svcId}0.webp" : '';
+            $svcInitial  = strtoupper(substr($s['name_en'] ?? $s['name'] ?? $svcId, 0, 2));
+            ?>
             <tr style="<?= !$s['is_published'] ? 'opacity:0.5;' : '' ?><?= $s['is_pinned'] ? 'background:#fffbeb;' : '' ?>" data-id="<?= $s['id'] ?>">
                 <td><input type="checkbox" class="row-cb" value="<?= $s['id'] ?>" onchange="updateCount()"></td>
                 <td style="color:#64748b;font-size:12px;"><?= $s['id'] ?></td>
                 <td><input type="number" class="field-input" data-field="sort_order" data-id="<?= $s['id'] ?>" value="<?= $s['sort_order'] ?: 100 ?>" style="width:50px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;"></td>
                 <td>
-                    <small style="color:#64748b;background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;"><?= htmlspecialchars($s['hero_service_id']) ?></small>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <img src="<?= htmlspecialchars($svcIconCdn) ?>"
+                             onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='<?= htmlspecialchars($svcIconPath) ?>';}else{this.onerror=null;this.outerHTML='<div style=\'width:32px;height:32px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\'><?= htmlspecialchars($svcInitial) ?></div>';}"
+                             style="width:32px;height:32px;border-radius:6px;object-fit:contain;background:#f8fafc;flex-shrink:0;"
+                             loading="lazy"
+                             title="<?= htmlspecialchars($s['name_en'] ?? $svcId) ?>">
+                        <small style="color:#64748b;background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;"><?= htmlspecialchars($svcId) ?></small>
+                    </div>
                 </td>
                 <td><input type="text" class="field-input" data-field="name_en" data-id="<?= $s['id'] ?>" value="<?= htmlspecialchars($s['name_en'] ?? $s['name'] ?? '') ?>" style="width:140px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;"></td>
                 <td><input type="text" class="field-input" data-field="name_cn" data-id="<?= $s['id'] ?>" value="<?= htmlspecialchars($s['name_cn'] ?? '') ?>" style="width:120px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" placeholder="中文名"></td>
