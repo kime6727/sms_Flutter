@@ -754,7 +754,15 @@ if ($path === '/payment/create' && $method === 'POST') {
         ]);
     } catch (Exception $e) {
         $db->rollBack();
-        apiServerError('创建支付订单失败');
+        error_log("[/payment/create] failed: " . $e->getMessage() . " at " . basename($e->getFile()) . ":" . $e->getLine());
+        // 调试阶段：透传 detail
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'error' => '创建支付订单失败',
+            'detail' => get_class($e) . ': ' . $e->getMessage() . ' at ' . basename($e->getFile()) . ':' . $e->getLine(),
+        ]);
     }
     exit;
 }
