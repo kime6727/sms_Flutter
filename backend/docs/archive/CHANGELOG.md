@@ -104,7 +104,7 @@ mysql -u root -p newsms < migrations/add_performance_indexes.sql
 ### 4. 性能测试
 ```bash
 # 测试API响应时间
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 ```
 
 ---

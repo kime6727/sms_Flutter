@@ -468,14 +468,14 @@ Logger::logRequest($method, $path, getCurrentUserIdFromToken() ?? 'guest', $dura
 ### 1. 订单取消退款测试
 ```bash
 # 测试pending订单取消（应该退款）
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/{pending_order_id}/cancel \
+curl -X POST https://sms.niceapp.eu.cc/orders/{pending_order_id}/cancel \
   -H "X-API-Key: YOUR_KEY" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # 预期结果: {"success":true,"refunded":true,"refund_amount":100}
 
 # 测试active订单取消（不应该退款）
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/{active_order_id}/cancel \
+curl -X POST https://sms.niceapp.eu.cc/orders/{active_order_id}/cancel \
   -H "X-API-Key: YOUR_KEY" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
@@ -485,7 +485,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/orders/{active_order_id}/cancel \
 ### 2. 性能测试
 ```bash
 # 使用ab工具测试
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 
 # 预期: 响应时间 < 200ms
 ```

@@ -48,7 +48,7 @@
 
 ### 第一步: 上传文件到服务器
 ```bash
-# 需要上传以下文件到 https://smsapi2.niceapp.eu.cc/backend/
+# 需要上传以下文件到 https://sms.niceapp.eu.cc/backend/
 
 1. index.php (已修复)
 2. config/constants.php (新建)
@@ -81,7 +81,7 @@ sudo service php8.1-fpm restart
 ```
 
 ### 第五步: 验证部署
-访问: https://smsapi2.niceapp.eu.cc/test/deploy_check.php
+访问: https://sms.niceapp.eu.cc/test/deploy_check.php
 
 期望结果:
 - ✅ 所有 PHP 环境检测通过
@@ -133,7 +133,7 @@ Error: SSL routines::ssl/tls alert handshake failure
 
 **建议:**
 1. 直接在服务器上执行: `php /path/to/backend/test/deploy_check.php`
-2. 或通过浏览器访问: https://smsapi2.niceapp.eu.cc/test/deploy_check.php
+2. 或通过浏览器访问: https://sms.niceapp.eu.cc/test/deploy_check.php
 3. 检查服务器 SSL 配置
 
 ---
@@ -202,7 +202,7 @@ mysql -u root -p newsms -e "SHOW INDEX FROM orders WHERE Key_name LIKE 'idx_%';"
 
 ### 测试 API Key 端点 (应该返回 404)
 ```bash
-curl -X GET "https://smsapi2.niceapp.eu.cc/api-key"
+curl -X GET "https://sms.niceapp.eu.cc/api-key"
 # 期望: 404 Not Found 或 401 Unauthorized
 ```
 
@@ -223,7 +223,7 @@ curl -X GET "https://smsapi2.niceapp.eu.cc/api-key"
 - ⏳ 服务重启
 
 **部署后即可验证**
-- 🎯 访问 https://smsapi2.niceapp.eu.cc/test/deploy_check.php
+- 🎯 访问 https://sms.niceapp.eu.cc/test/deploy_check.php
 - 🎯 查看 "11. 新修复验证 ⭐" 结果
 - 🎯 确认所有检测项通过
 

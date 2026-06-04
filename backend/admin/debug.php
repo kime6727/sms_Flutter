@@ -1,7 +1,7 @@
 <?php
 /**
  * Session 调试页面
- * 访问: https://smsapi2.niceapp.eu.cc/admin/debug.php
+ * 访问: https://sms.niceapp.eu.cc/admin/debug.php
  */
 
 // 配置 session cookie 参数以支持 HTTPS

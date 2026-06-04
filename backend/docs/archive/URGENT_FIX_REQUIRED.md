@@ -2,7 +2,7 @@
 
 ## 检测结果分析
 
-根据 https://smsapi2.niceapp.eu.cc/test/deploy_check.php 的检测结果：
+根据 https://sms.niceapp.eu.cc/test/deploy_check.php 的检测结果：
 
 ### ❌ 关键问题：服务器上的 index.php 未更新
 
@@ -92,7 +92,7 @@ scp backend/index.php user@server:/path/to/backend/index.php
 ssh user@server "sudo systemctl restart php-fpm"
 
 # 4. 验证
-curl https://smsapi2.niceapp.eu.cc/test/deploy_check.php?format=json | grep autoExpireOrders
+curl https://sms.niceapp.eu.cc/test/deploy_check.php?format=json | grep autoExpireOrders
 ```
 
 ### 方案 2: 直接在服务器上修改
@@ -160,7 +160,7 @@ sudo systemctl restart php-fpm
 ```
 
 ### 第 5 步: 验证部署
-访问: https://smsapi2.niceapp.eu.cc/test/deploy_check.php
+访问: https://sms.niceapp.eu.cc/test/deploy_check.php
 
 期望结果：
 ```

@@ -189,7 +189,7 @@ if ($path === '/auth/forgot-password' && $method === 'POST') {
                  . "如需自定义密码，请使用以下重置令牌：\n$resetToken\n"
                  . "（30 分钟内有效，可通过应用内「重置密码」页使用）\n\n"
                  . "此致\nSimu SMS 团队";
-        $headers = 'From: no-reply@smsapi2.niceapp.eu.cc' . "\r\n" .
+        $headers = 'From: no-reply@sms.niceapp.eu.cc' . "\r\n" .
                    'Content-Type: text/plain; charset=UTF-8';
         @mail($user['email'], $subject, $message, $headers);
     } catch (Exception $e) {

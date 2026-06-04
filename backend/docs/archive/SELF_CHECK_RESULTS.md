@@ -164,13 +164,13 @@ renderResult('11. 新修复验证 ⭐', $fixResults);
 
 ### 修复前 (不安全)
 ```bash
-curl -X GET "https://smsapi2.niceapp.eu.cc/api-key"
+curl -X GET "https://sms.niceapp.eu.cc/api-key"
 # 返回: {"api_key": "hero_sms_api_key_12345"}  ❌ 泄露密钥
 ```
 
 ### 修复后 (安全)
 ```bash
-curl -X GET "https://smsapi2.niceapp.eu.cc/api-key"
+curl -X GET "https://sms.niceapp.eu.cc/api-key"
 # 期望返回: 404 Not Found 或 401 Unauthorized  ✅ 安全
 ```
 
@@ -302,7 +302,7 @@ Error: OpenSSL/3.2.1: error:0A000410:SSL routines::ssl/tls alert handshake failu
 ### 🎯 下一步行动
 
 **立即可做:**
-1. 通过浏览器访问: https://smsapi2.niceapp.eu.cc/test/deploy_check.php
+1. 通过浏览器访问: https://sms.niceapp.eu.cc/test/deploy_check.php
 2. 查看当前检测结果
 3. 按照 DEPLOYMENT_CHECKLIST.md 执行部署
 

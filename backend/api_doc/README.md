@@ -911,7 +911,7 @@ points = cost_usd × 100 × coefficient × (1 - membership_discount)
   "success": true,
   "data": {
     "app_name": "Simu SMS",
-    "support_email": "support@smsapi2.niceapp.eu.cc",
+    "support_email": "support@sms.niceapp.eu.cc",
     "min_topup": 1,
     "max_topup": 10000,
     "default_coefficient_before": 4.0,

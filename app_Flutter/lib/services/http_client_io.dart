@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 /// Creates an HTTP client for mobile platforms (iOS/Android).
 ///
 /// In DEBUG mode: SSL certificate verification is bypassed. This allows
-/// development against local servers (e.g. ServBay) that use self-signed
+/// development against local servers (e.g. local dev) that use self-signed
 /// or local-CA certificates not trusted by Dart's BoringSSL layer.
 ///
 /// In RELEASE mode: standard SSL verification is enforced. The production

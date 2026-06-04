@@ -73,10 +73,10 @@ async function makeRequest(url, options) {
 
 ```javascript
 // ✅ 始终使用HTTPS
-const API_BASE = 'https://smsapi2.niceapp.eu.cc/api';
+const API_BASE = 'https://sms.niceapp.eu.cc/api';
 
 // ❌ 不要使用HTTP
-// const API_BASE = 'http://smsapi2.niceapp.eu.cc/api';
+// const API_BASE = 'http://sms.niceapp.eu.cc/api';
 ```
 
 ### ❌ DON'T - 避免做法
@@ -598,7 +598,7 @@ jest.mock('./api', () => ({
 ```javascript
 // ❌ 不要在测试中使用真实API
 test('create order', async () => {
-  const order = await fetch('https://smsapi2.niceapp.eu.cc/api/orders', {
+  const order = await fetch('https://sms.niceapp.eu.cc/api/orders', {
     method: 'POST',
     // 真实请求会消耗积分
   });

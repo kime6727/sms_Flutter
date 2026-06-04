@@ -115,7 +115,7 @@ sudo systemctl restart php-fpm
 #### 1. 测试订单取消退款
 ```bash
 # 创建订单
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/create \
+curl -X POST https://sms.niceapp.eu.cc/orders/create \
   -H "X-API-Key: YOUR_KEY" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
@@ -127,7 +127,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/orders/create \
   }'
 
 # 取消订单（pending状态应该退款）
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/{order_id}/cancel \
+curl -X POST https://sms.niceapp.eu.cc/orders/{order_id}/cancel \
   -H "X-API-Key: YOUR_KEY" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
@@ -147,7 +147,7 @@ tail -f /var/log/sms-receiver/api.log
 
 #### 3. 验证性能
 ```bash
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 ```
 
 ---

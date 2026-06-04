@@ -7,7 +7,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "https://smsapi2.niceapp.eu.cc/api",
+      "value": "https://sms.niceapp.eu.cc/api",
       "type": "string"
     },
     {

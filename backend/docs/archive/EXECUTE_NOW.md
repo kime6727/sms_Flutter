@@ -13,7 +13,7 @@
 
 ```bash
 # SSH连接到服务器
-ssh user@smsapi2.niceapp.eu.cc
+ssh user@sms.niceapp.eu.cc
 
 # 备份数据库
 mysqldump -u root -p newsms > /backup/newsms_$(date +%Y%m%d_%H%M%S).sql
@@ -83,10 +83,10 @@ sudo systemctl status php-fpm
 
 ```bash
 # 测试健康检查
-curl https://smsapi2.niceapp.eu.cc/health
+curl https://sms.niceapp.eu.cc/health
 
 # 测试API Key端点（应该返回404或401）
-curl https://smsapi2.niceapp.eu.cc/api-key
+curl https://sms.niceapp.eu.cc/api-key
 
 # 检查日志文件
 tail -f /var/log/sms-receiver/api.log
@@ -117,7 +117,7 @@ API_KEY="your_api_key"
 TOKEN="your_token"
 
 # 2. 创建测试订单
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/create \
+curl -X POST https://sms.niceapp.eu.cc/orders/create \
   -H "X-API-Key: $API_KEY" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -131,7 +131,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/orders/create \
 # 记录返回的order_id
 
 # 3. 取消订单（应该退款）
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/{order_id}/cancel \
+curl -X POST https://sms.niceapp.eu.cc/orders/{order_id}/cancel \
   -H "X-API-Key: $API_KEY" \
   -H "Authorization: Bearer $TOKEN"
 
@@ -153,7 +153,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/orders/{order_id}/cancel \
 sudo apt-get install apache2-utils
 
 # 测试API性能
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 
 # 预期结果:
 # - Requests per second: > 200
@@ -255,7 +255,7 @@ cd /path/to/backend
 部署完成后：
 
 1. ✅ 访问运营后台验证功能
-   - https://smsapi2.niceapp.eu.cc/admin/login.php
+   - https://sms.niceapp.eu.cc/admin/login.php
 
 2. ✅ 测试订单创建和取消
 

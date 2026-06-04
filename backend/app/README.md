@@ -4,7 +4,7 @@
 
 应用已部署到：
 ```
-https://smsapi2.niceapp.eu.cc/app/
+https://sms.niceapp.eu.cc/app/
 ```
 
 ## 功能说明
@@ -60,7 +60,7 @@ https://smsapi2.niceapp.eu.cc/app/
 
 ## API 配置
 
-后端 API: `https://smsapi2.niceapp.eu.cc/api`
+后端 API: `https://sms.niceapp.eu.cc/api`
 
 ## 部署时间
 

@@ -35,7 +35,7 @@ cp -r /path/to/backend /backup/backend_$(date +%Y%m%d_%H%M%S)
 
 ```bash
 # 连接到服务器
-ssh user@smsapi2.niceapp.eu.cc
+ssh user@sms.niceapp.eu.cc
 
 # 进入backend目录
 cd /path/to/backend
@@ -94,7 +94,7 @@ sudo systemctl restart nginx
 
 ### 6.1 测试健康检查
 ```bash
-curl https://smsapi2.niceapp.eu.cc/health
+curl https://sms.niceapp.eu.cc/health
 # 预期: {"status":"ok","timestamp":"2026-05-11 ..."}
 ```
 
@@ -104,7 +104,7 @@ curl https://smsapi2.niceapp.eu.cc/health
 ```bash
 # 1. 先创建一个订单（获取order_id）
 # 2. 取消订单
-curl -X POST https://smsapi2.niceapp.eu.cc/orders/{order_id}/cancel \
+curl -X POST https://sms.niceapp.eu.cc/orders/{order_id}/cancel \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Authorization: Bearer YOUR_TOKEN"
 
@@ -141,7 +141,7 @@ tail -f /var/log/sms-receiver/error.log
 sudo apt-get install apache2-utils
 
 # 测试服务列表接口（100并发，1000请求）
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 
 # 预期结果:
 # - 平均响应时间 < 200ms
@@ -307,7 +307,7 @@ tail -100 /var/log/php-fpm/error.log
 ## ✅ 部署完成
 
 部署完成后，请在运营后台验证：
-- 访问: https://smsapi2.niceapp.eu.cc/admin/login.php
+- 访问: https://sms.niceapp.eu.cc/admin/login.php
 - 检查订单列表
 - 测试订单取消功能
 - 查看系统日志

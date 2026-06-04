@@ -23,7 +23,7 @@ API Key已配置在系统中：
 使用设备ID注册用户，获取Token：
 
 ```bash
-curl -X POST https://smsapi2.niceapp.eu.cc/api/auth/register \
+curl -X POST https://sms.niceapp.eu.cc/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "device_id": "my_device_123"
@@ -57,7 +57,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/api/auth/register \
 获取所有可用的服务和国家：
 
 ```bash
-curl -X GET https://smsapi2.niceapp.eu.cc/api/service-countries/published \
+curl -X GET https://sms.niceapp.eu.cc/api/service-countries/published \
   -H "X-API-Key: 606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077"
 ```
 
@@ -85,7 +85,7 @@ curl -X GET https://smsapi2.niceapp.eu.cc/api/service-countries/published \
 选择服务和国家，创建订单：
 
 ```bash
-curl -X POST https://smsapi2.niceapp.eu.cc/api/orders \
+curl -X POST https://sms.niceapp.eu.cc/api/orders \
   -H "Content-Type: application/json" \
   -H "X-API-Key: 606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077" \
   -H "Authorization: Bearer YOUR_TOKEN" \
@@ -117,7 +117,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/api/orders \
 激活订单获取真实手机号码：
 
 ```bash
-curl -X POST https://smsapi2.niceapp.eu.cc/api/orders/ORDER_ID/activate \
+curl -X POST https://sms.niceapp.eu.cc/api/orders/ORDER_ID/activate \
   -H "X-API-Key: 606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
@@ -144,7 +144,7 @@ curl -X POST https://smsapi2.niceapp.eu.cc/api/orders/ORDER_ID/activate \
 轮询订单状态，获取验证码：
 
 ```bash
-curl -X GET https://smsapi2.niceapp.eu.cc/api/orders/ORDER_ID \
+curl -X GET https://sms.niceapp.eu.cc/api/orders/ORDER_ID \
   -H "X-API-Key: 606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
@@ -213,7 +213,7 @@ curl -X GET https://smsapi2.niceapp.eu.cc/api/orders/ORDER_ID \
 ### JavaScript
 
 ```javascript
-const API_BASE = 'https://smsapi2.niceapp.eu.cc/api';
+const API_BASE = 'https://sms.niceapp.eu.cc/api';
 const API_KEY = '606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077';
 
 // 1. 注册
@@ -281,7 +281,7 @@ checkSms();
 import requests
 import time
 
-API_BASE = 'https://smsapi2.niceapp.eu.cc/api'
+API_BASE = 'https://sms.niceapp.eu.cc/api'
 API_KEY = '606e960bb9bf523fd52b9df68d2ad44e549fef6b9a48ccdcbadd3ca90d5b3077'
 
 # 1. 注册
@@ -370,5 +370,5 @@ while True:
 
 如有问题，请查阅完整文档或联系技术支持。
 
-**Base URL**: https://smsapi2.niceapp.eu.cc/api  
+**Base URL**: https://sms.niceapp.eu.cc/api  
 **文档版本**: v1.0

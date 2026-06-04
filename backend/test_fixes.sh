@@ -3,7 +3,7 @@
 # 后端修复验证脚本
 # 用途: 快速验证所有修复是否生效
 
-BASE_URL="https://smsapi2.niceapp.eu.cc"
+BASE_URL="https://sms.niceapp.eu.cc"
 API_KEY="YOUR_API_KEY"  # 请替换为实际的API Key
 TOKEN="YOUR_TOKEN"      # 请替换为实际的Token
 

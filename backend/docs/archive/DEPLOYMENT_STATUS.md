@@ -45,8 +45,8 @@
 
 - [ ] **运行部署检测**
   ```bash
-  # 访问: https://smsapi2.niceapp.eu.cc/test/deploy_check.php
-  # 或JSON格式: https://smsapi2.niceapp.eu.cc/test/deploy_check.php?format=json
+  # 访问: https://sms.niceapp.eu.cc/test/deploy_check.php
+  # 或JSON格式: https://sms.niceapp.eu.cc/test/deploy_check.php?format=json
   ```
 
 ---
@@ -92,7 +92,7 @@ tail -f /var/log/sms-receiver/api.log
 
 #### 3. 验证性能
 ```bash
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 ```
 
 ---

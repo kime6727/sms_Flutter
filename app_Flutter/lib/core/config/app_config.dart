@@ -5,7 +5,7 @@ class AppConfig {
   // 远程生产环境域名
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://smsapi2.niceapp.eu.cc',
+    defaultValue: 'https://sms.niceapp.eu.cc',
   );
 
   // API Key 必须在构建时通过 --dart-define=API_KEY=... 注入

@@ -174,13 +174,13 @@ cd /path/to/backend
 ## 📈 性能测试结果
 
 ### 测试环境
-- 服务器: https://smsapi2.niceapp.eu.cc
+- 服务器: https://sms.niceapp.eu.cc
 - 测试工具: Apache Bench (ab)
 - 测试参数: 1000请求，100并发
 
 ### 测试命令
 ```bash
-ab -n 1000 -c 100 https://smsapi2.niceapp.eu.cc/services
+ab -n 1000 -c 100 https://sms.niceapp.eu.cc/services
 ```
 
 ### 预期结果

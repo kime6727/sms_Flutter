@@ -6,7 +6,7 @@ const https = require('https');
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 // API 配置
-const API_BASE = 'https://smsapi2.niceapp.eu.cc';
+const API_BASE = 'https://sms.niceapp.eu.cc';
 const API_KEY = process.env.API_KEY || 'YOUR_API_KEY_HERE';
 
 // HTTP请求辅助函数

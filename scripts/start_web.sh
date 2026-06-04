@@ -4,7 +4,7 @@
 # 用途：快速启动 Flutter Web 应用进行测试
 
 echo "🚀 启动 Flutter Web 应用..."
-echo "📍 后端地址: https://smsapi2.niceapp.eu.cc"
+echo "📍 后端地址: https://sms.niceapp.eu.cc"
 echo "🌐 Web地址: http://localhost:9090"
 echo ""
 
