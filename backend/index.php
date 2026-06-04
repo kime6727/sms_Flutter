@@ -325,20 +325,6 @@ try {
         exit;
     }
 
-    // 临时调试 - 看 service_countries 表的 Telegram/Kazakhstan 记录
-    if ($path === '/debug/sc' && $method === 'GET') {
-        header('Content-Type: application/json; charset=utf-8');
-        $rows = $db->query(
-            "SELECT sc.*, s.hero_service_id, s.name as svc_name, c.hero_country_id, c.name_en as country_name
-             FROM service_countries sc
-             LEFT JOIN services s ON sc.service_id = s.id
-             LEFT JOIN countries c ON sc.country_id = c.id
-             WHERE s.hero_service_id = 'tg' AND c.name_en = 'Kazakhstan'"
-        )->fetchAll();
-        echo json_encode(['rows' => $rows], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-        exit;
-    }
-
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
 
