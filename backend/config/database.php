@@ -46,11 +46,12 @@ $dbName = dbEnv('DB_NAME', $env, 'sms_receiver');
 $dbUser = dbEnv('DB_USER', $env, 'root');
 $dbPass = dbEnv('DB_PASS', $env, '');
 
-define('DB_HOST', $dbHost);
-define('DB_PORT', $dbPort);
-define('DB_NAME', $dbName);
-define('DB_USER', $dbUser);
-define('DB_PASS', $dbPass);
+// 用 defined() 守卫，避免 webhook 等独立 require 时重复定义触发 fatal
+if (!defined('DB_HOST')) define('DB_HOST', $dbHost);
+if (!defined('DB_PORT')) define('DB_PORT', $dbPort);
+if (!defined('DB_NAME')) define('DB_NAME', $dbName);
+if (!defined('DB_USER')) define('DB_USER', $dbUser);
+if (!defined('DB_PASS')) define('DB_PASS', $dbPass);
 
 // SSL 配置（云数据库如 TiDB Cloud / 阿里云 RDS / AWS RDS 需要）
 // 优先从 .env 读，缺失则从系统环境变量读

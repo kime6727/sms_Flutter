@@ -11,17 +11,17 @@ if ($path === '/payment-config/match' && $method === 'GET') {
     }
     
     $config = $db->query(
-        "SELECT * FROM payment_configs WHERE min_amount <= ? AND max_amount >= ? AND is_active = 1 ORDER BY priority DESC LIMIT 1",
+        "SELECT * FROM payment_configs WHERE price <= ? AND price >= ? AND active = 1 ORDER BY sort_order ASC, id ASC LIMIT 1",
         [$amount, $amount]
     )->fetch();
-    
+
     echo json_encode(['success' => true, 'data' => $config]);
     exit;
 }
 
 // 获取所有支付配置
 if ($path === '/payment-configs' && $method === 'GET') {
-    $configs = $db->query("SELECT * FROM payment_configs WHERE is_active = 1 ORDER BY priority DESC")->fetchAll();
+    $configs = $db->query("SELECT * FROM payment_configs WHERE active = 1 ORDER BY sort_order ASC, id ASC")->fetchAll();
     echo json_encode(['success' => true, 'data' => $configs]);
     exit;
 }
@@ -485,8 +485,18 @@ if ($path === '/services/price' && $method === 'GET') {
 
 // 获取默认系数
 if ($path === '/coefficients/default' && $method === 'GET') {
-    $coefficients = $db->query("SELECT * FROM price_coefficients WHERE is_default = 1")->fetchAll();
-    echo json_encode(['success' => true, 'data' => $coefficients]);
+    // 用 system_settings 读默认系数（price_coefficients 表在 database.sql 中不存在）
+    $before = floatval(getSetting($db, 'default_coefficient_before', '4'));
+    $after = floatval(getSetting($db, 'default_coefficient_after', '4.5'));
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'service_coefficient' => $before,
+            'country_coefficient' => $after,
+            'coefficient_before' => $before,
+            'coefficient_after' => $after,
+        ]
+    ]);
     exit;
 }
 
@@ -954,11 +964,11 @@ if ($path === '/banners' && $method === 'GET') {
 // 获取支付套餐（/payment/packages 别名，兼容前端调用）
 // 查询 payment_configs 表（运营后台配置的表）
 if ($path === '/payment/packages' && $method === 'GET') {
-    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description, is_recommended, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
-    
-    // 将 is_recommended 和 active 转换为布尔值
+    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+
+    // active 字段转布尔（payment_configs 表没有 is_recommended 列）
     $packages = array_map(function($pkg) {
-        $pkg['is_recommended'] = intval($pkg['is_recommended']) === 1;
+        $pkg['is_recommended'] = false; // 默认不推荐
         $pkg['active'] = intval($pkg['active']) === 1;
         return $pkg;
     }, $packages);
@@ -969,7 +979,7 @@ if ($path === '/payment/packages' && $method === 'GET') {
 
 // 获取充值套餐（/topup-packages 别名）
 if ($path === '/topup-packages' && $method === 'GET') {
-    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description, is_recommended, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
     echo json_encode(['success' => true, 'data' => $packages]);
     exit;
 }

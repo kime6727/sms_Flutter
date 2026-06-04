@@ -201,7 +201,7 @@ if ($path === '/stock' && $method === 'GET') {
     }
     
     $cacheKey = "stock_{$serviceId}_{$countryId}";
-    $cached = $db->query("SELECT * FROM cache WHERE key = ? AND expires_at > NOW()", [$cacheKey])->fetch();
+    $cached = $db->query("SELECT * FROM cache WHERE `key` = ? AND expires_at > NOW()", [$cacheKey])->fetch();
     
     if ($cached) {
         echo json_encode(['success' => true, 'data' => json_decode($cached['value'], true)]);
