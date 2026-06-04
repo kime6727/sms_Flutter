@@ -86,7 +86,7 @@ if ($path === '/orders' && $method === 'POST') {
         
         // 获取真实美元成本价
         $usdPrice = $db->query(
-            "SELECT price FROM service_countries WHERE service_id = ? AND country_id = ? AND is_published = 1 AND active = 1 LIMIT 1",
+            "SELECT price FROM service_countries WHERE service_id = ? AND country_id = ? AND is_published = 1 AND is_active = 1 LIMIT 1",
             [$serviceId, $countryId]
         )->fetchColumn();
         
