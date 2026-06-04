@@ -325,46 +325,17 @@ try {
         exit;
     }
 
-    // 临时调试
-    if ($path === '/debug/prices' && $method === 'GET') {
+    // 临时调试 - 看 service_countries 表的 Telegram/Kazakhstan 记录
+    if ($path === '/debug/sc' && $method === 'GET') {
         header('Content-Type: application/json; charset=utf-8');
-        $r = $heroSMS->getPrices();
-        // 抽取前 3 个样本
-        $sample = [];
-        $i = 0;
-        if (!empty($r['prices'])) {
-            foreach ($r['prices'] as $k1 => $v1) {
-                if ($i++ >= 3) break;
-                if (is_array($v1)) {
-                    $inner = [];
-                    $j = 0;
-                    foreach ($v1 as $k2 => $v2) {
-                        if ($j++ >= 3) break;
-                        $inner[$k2] = $v2;
-                    }
-                    $sample[$k1] = $inner;
-                } else {
-                    $sample[$k1] = $v1;
-                }
-            }
-        }
-        echo json_encode(['success' => true, 'sample' => $sample, 'top_keys' => is_array($r['prices'] ?? null) ? array_slice(array_keys($r['prices']), 0, 5) : []], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    // 临时调试 - 看 getServicesList 真实结构
-    if ($path === '/debug/services-list' && $method === 'GET') {
-        header('Content-Type: application/json; charset=utf-8');
-        $r = $heroSMS->getServicesList();
-        $sample = [];
-        $i = 0;
-        if (!empty($r['services'])) {
-            foreach ($r['services'] as $k1 => $v1) {
-                if ($i++ >= 3) break;
-                $sample[$k1] = $v1;
-            }
-        }
-        echo json_encode(['success' => true, 'sample' => $sample, 'raw' => substr(json_encode($r, JSON_UNESCAPED_UNICODE), 0, 1500)], JSON_UNESCAPED_UNICODE);
+        $rows = $db->query(
+            "SELECT sc.*, s.hero_service_id, s.name as svc_name, c.hero_country_id, c.name_en as country_name
+             FROM service_countries sc
+             LEFT JOIN services s ON sc.service_id = s.id
+             LEFT JOIN countries c ON sc.country_id = c.id
+             WHERE s.hero_service_id = 'tg' AND c.name_en = 'Kazakhstan'"
+        )->fetchAll();
+        echo json_encode(['rows' => $rows], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         exit;
     }
 
