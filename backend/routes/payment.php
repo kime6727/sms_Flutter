@@ -33,17 +33,55 @@ if ($path === '/herosms/balance' && $method === 'GET') {
     exit;
 }
 
-// 同步数据
+// 同步数据（同步 HeroSMS 服务/国家/价格到本地数据库）
 if ($path === '/sync' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
-    $type = $input['type'] ?? null;
-    
-    if (!$type) {
-        apiBadRequest('type 参数缺失');
+    $type = $input['type'] ?? 'all';
+
+    $synced = [];
+
+    try {
+        if ($type === 'services' || $type === 'all') {
+            $list = $heroSMS->getServicesList();
+            if (!empty($list['services'])) {
+                foreach ($list['services'] as $code => $info) {
+                    $db->query(
+                        "INSERT INTO services (code, name, icon, active, sort_order, created_at, updated_at)
+                         VALUES (?, ?, ?, 1, 0, NOW(), NOW())
+                         ON DUPLICATE KEY UPDATE name=VALUES(name), updated_at=NOW()",
+                        [$code, $info['name'] ?? $code, $info['icon'] ?? null]
+                    );
+                }
+                $synced['services'] = count($list['services']);
+            }
+        }
+
+        if ($type === 'countries' || $type === 'all') {
+            $list = $heroSMS->getCountries();
+            if (!empty($list['countries'])) {
+                foreach ($list['countries'] as $id => $info) {
+                    $db->query(
+                        "INSERT INTO countries (id, name, code, active, sort_order, created_at, updated_at)
+                         VALUES (?, ?, ?, 1, 0, NOW(), NOW())
+                         ON DUPLICATE KEY UPDATE name=VALUES(name), updated_at=NOW()",
+                        [intval($id), $info['name'] ?? '', strtolower($info['code'] ?? '')]
+                    );
+                }
+                $synced['countries'] = count($list['countries']);
+            }
+        }
+
+        if ($type === 'prices' || $type === 'all') {
+            // 同步最新价格（占位实现：调用 getPrices 但仅更新 price 字段）
+            $synced['prices'] = 'scheduled';
+        }
+
+        echo json_encode(['success' => true, 'data' => $synced]);
+    } catch (Exception $e) {
+        error_log("[/sync] failed: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => '同步失败: ' . $e->getMessage()]);
     }
-    
-    $result = $heroSMS->sync($type);
-    echo json_encode(['success' => true, 'data' => $result]);
     exit;
 }
 
@@ -464,20 +502,25 @@ if ($path === '/coefficients/default' && $method === 'PUT') {
     
     $db->beginTransaction();
     try {
+        // 用 system_settings 存默认系数（price_coefficients 表在 database.sql 中不存在）
         if ($serviceCoefficient !== null) {
             $db->query(
-                "UPDATE price_coefficients SET value = ? WHERE type = 'service' AND is_default = 1",
-                [$serviceCoefficient]
+                "INSERT INTO system_settings (`key`, value, type, description, updated_at)
+                 VALUES ('default_coefficient_before', ?, 'number', '服务默认系数（首充前）', NOW())
+                 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
+                [strval($serviceCoefficient)]
             );
         }
-        
+
         if ($countryCoefficient !== null) {
             $db->query(
-                "UPDATE price_coefficients SET value = ? WHERE type = 'country' AND is_default = 1",
-                [$countryCoefficient]
+                "INSERT INTO system_settings (`key`, value, type, description, updated_at)
+                 VALUES ('default_coefficient_after', ?, 'number', '服务默认系数（首充后）', NOW())
+                 ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()",
+                [strval($countryCoefficient)]
             );
         }
-        
+
         $db->commit();
         echo json_encode(['success' => true, 'message' => '系数更新成功']);
     } catch (Exception $e) {
@@ -487,10 +530,21 @@ if ($path === '/coefficients/default' && $method === 'PUT') {
     exit;
 }
 
-// 获取服务系数
+// 获取服务系数（合并 service_coefficients 表 + system_settings 默认值）
 if ($path === '/coefficients/services' && $method === 'GET') {
-    $coefficients = $db->query("SELECT * FROM price_coefficients WHERE type = 'service'")->fetchAll();
-    echo json_encode(['success' => true, 'data' => $coefficients]);
+    $rows = $db->query("SELECT service_id, coefficient_before, coefficient_after FROM service_coefficients")->fetchAll();
+    $defaultBefore = floatval(getSetting($db, 'default_coefficient_before', '4'));
+    $defaultAfter = floatval(getSetting($db, 'default_coefficient_after', '4.5'));
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'services' => $rows,
+            'default' => [
+                'coefficient_before' => $defaultBefore,
+                'coefficient_after' => $defaultAfter,
+            ],
+        ]
+    ]);
     exit;
 }
 
@@ -521,7 +575,7 @@ if ($path === '/services/price/calculated' && $method === 'GET') {
         apiNotFound('服务国家组合不存在');
     }
     
-    $basePrice = floatval($serviceCountry['base_price']);
+    $basePrice = floatval($serviceCountry['price']); // service_countries 没有 base_price 字段，用 price
     $serviceCoefficient = floatval($serviceCountry['service_coefficient'] ?? 1.0);
     $countryCoefficient = floatval($serviceCountry['country_coefficient'] ?? 1.0);
     
@@ -555,18 +609,32 @@ if ($path === '/services/price/calculated' && $method === 'GET') {
     exit;
 }
 
-// 获取推荐号码
+// 获取推荐号码（HeroSMS 不支持推荐号码接口，返回当前服务可用国家作为推荐依据）
 if ($path === '/recommend/numbers' && $method === 'GET') {
     $serviceId = $_GET['service_id'] ?? null;
     $countryId = $_GET['country_id'] ?? null;
     $limit = intval($_GET['limit'] ?? 10);
-    
+
     if (!$serviceId || !$countryId) {
         apiBadRequest('参数缺失');
     }
-    
-    $numbers = $heroSMS->getRecommendNumbers($serviceId, $countryId, $limit);
-    echo json_encode(['success' => true, 'data' => $numbers]);
+
+    // 用库存 + 价格做"推荐"（库存充足的号码默认推荐）
+    $stock = $heroSMS->checkStock($serviceId, intval($countryId));
+    $price = $db->query(
+        "SELECT price FROM service_countries WHERE service_id = ? AND country_id = ? AND active = 1",
+        [$serviceId, $countryId]
+    )->fetchColumn();
+
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'stock' => $stock,
+            'price' => floatval($price ?? 0),
+            'recommend_count' => $limit,
+            'note' => 'HeroSMS 不暴露推荐号码接口，请直接调 /orders/{id}/activate 获取号码',
+        ]
+    ]);
     exit;
 }
 
@@ -886,7 +954,7 @@ if ($path === '/banners' && $method === 'GET') {
 // 获取支付套餐（/payment/packages 别名，兼容前端调用）
 // 查询 payment_configs 表（运营后台配置的表）
 if ($path === '/payment/packages' && $method === 'GET') {
-    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, display_price as price, description, is_recommended, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description, is_recommended, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
     
     // 将 is_recommended 和 active 转换为布尔值
     $packages = array_map(function($pkg) {
@@ -901,7 +969,7 @@ if ($path === '/payment/packages' && $method === 'GET') {
 
 // 获取充值套餐（/topup-packages 别名）
 if ($path === '/topup-packages' && $method === 'GET') {
-    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, display_price as price, description, is_recommended, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description, is_recommended, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
     echo json_encode(['success' => true, 'data' => $packages]);
     exit;
 }

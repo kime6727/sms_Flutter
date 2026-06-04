@@ -49,14 +49,17 @@ if ($path === '/auth/password-login' && $method === 'POST') {
     exit;
 }
 
-// 修改密码
+// 修改密码（安全修复：user_id 从 token 取，不接受 body）
 if ($path === '/auth/change-password' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
-    $userId = $input['user_id'] ?? null;
+    $userId = getCurrentUserIdFromToken(); // 不再用 body 里的 user_id
     $oldPassword = $input['old_password'] ?? null;
     $newPassword = $input['new_password'] ?? null;
-    
-    if (!$userId || !$oldPassword || !$newPassword) {
+
+    if (!$userId) {
+        apiUnauthorized('请先登录');
+    }
+    if (!$oldPassword || !$newPassword) {
         apiBadRequest('参数缺失');
     }
     
@@ -89,13 +92,16 @@ if ($path === '/auth/change-password' && $method === 'POST') {
     exit;
 }
 
-// 验证密码
+// 验证密码（安全修复：user_id 从 token 取）
 if ($path === '/auth/verify-password' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
-    $userId = $input['user_id'] ?? null;
+    $userId = getCurrentUserIdFromToken();
     $password = $input['password'] ?? null;
-    
-    if (!$userId || !$password) {
+
+    if (!$userId) {
+        apiUnauthorized('请先登录');
+    }
+    if (!$password) {
         apiBadRequest('参数缺失');
     }
     
@@ -190,11 +196,11 @@ if ($path === '/auth/forgot-password' && $method === 'POST') {
         error_log("Failed to send password reset email: " . $e->getMessage());
     }
 
-    // 返回新密码给前端，让 App 内可直接展示给用户（仅已注册邮箱才返 new_password）
+    // 安全修复：不再在 JSON 响应中返回明文密码
+    // 新密码仅通过邮件/通知发送给用户，避免日志/中间人泄露
     echo json_encode([
         'success' => true,
-        'new_password' => $newPassword,
-        'message' => '新密码已生成，请妥善保管'
+        'message' => '密码已重置，新密码已发送至您绑定的邮箱'
     ]);
     exit;
 }

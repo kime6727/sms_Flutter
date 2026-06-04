@@ -119,7 +119,7 @@ if ($path === '/user/profile' && $method === 'PUT') {
     $email = $input['email'] ?? null;
     $oldPassword = $input['old_password'] ?? null;
     $newPassword = $input['new_password'] ?? null;
-    $setPassword = $input['set_password'] ?? null;
+    // 安全修复：移除 set_password 字段（无旧密码直接改密是严重越权）
     
     $db->beginTransaction();
     try {
@@ -172,16 +172,8 @@ if ($path === '/user/profile' && $method === 'PUT') {
                 "UPDATE users SET password_hash = ? WHERE id = ?",
                 [password_hash($newPassword, PASSWORD_BCRYPT), $userId]
             );
-        } elseif ($setPassword) {
-            if (strlen($setPassword) < 8) {
-                apiError('密码长度至少8位', 400, 'password_too_short');
-            }
-            
-            $db->query(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
-                [password_hash($setPassword, PASSWORD_BCRYPT), $userId]
-            );
         }
+        // 移除原 set_password 分支（无旧密码直接改密，已被上面注释删除）
         
         // 修改昵称和头像（无需验证）
         if ($nickname !== null || $avatar !== null) {

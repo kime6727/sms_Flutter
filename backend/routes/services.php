@@ -208,7 +208,11 @@ if ($path === '/stock' && $method === 'GET') {
         exit;
     }
     
-    $stock = $heroSMS->getStock($serviceId, $countryId);
+    // 调 HeroSMS checkStock（方法名是 checkStock 不是 getStock，参数是 service_code + country_id）
+    // serviceId 参数实际上前端传的是 service_id，需要 JOIN 一下拿到 service code
+    $serviceRow = $db->query("SELECT code FROM services WHERE id = ?", [$serviceId])->fetch();
+    $serviceCode = $serviceRow['code'] ?? $serviceId;
+    $stock = $heroSMS->checkStock($serviceCode, intval($countryId));
     
     $db->query(
         "INSERT INTO cache (key, value, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 60 SECOND)) 

@@ -288,6 +288,55 @@ CREATE TABLE IF NOT EXISTS `payment_configs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
+-- 12.1 充值订单表（topup_orders）+ 支付订单（payment_orders）
+-- 合并：同一张表支持 Apple IAP / 充值 / 支付 多种来源
+-- ============================================
+CREATE TABLE IF NOT EXISTS `topup_orders` (
+  `id` varchar(36) NOT NULL,
+  `user_id` varchar(36) NOT NULL,
+  `package_id` int DEFAULT NULL COMMENT 'payment_configs.id 或 topup_packages.id',
+  `package_source` varchar(20) DEFAULT 'topup_packages' COMMENT 'topup_packages / payment_configs',
+  `product_id` varchar(50) DEFAULT NULL,
+  `package_name` varchar(255) DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '支付金额（CNY/USD）',
+  `currency` varchar(10) DEFAULT 'CNY',
+  `points` int NOT NULL DEFAULT '0' COMMENT '到账积分',
+  `payment_method` varchar(20) DEFAULT 'apple_iap' COMMENT 'apple_iap / manual / admin',
+  `status` varchar(20) DEFAULT 'pending' COMMENT 'pending / paid / failed / refunded',
+  `transaction_id` varchar(255) DEFAULT NULL COMMENT 'Apple transaction id',
+  `receipt` mediumtext COMMENT 'Apple receipt（base64）',
+  `paid_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_status` (`status`),
+  KEY `idx_transaction_id` (`transaction_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- payment_orders 兼容别名（部分老代码引用此表）
+CREATE TABLE IF NOT EXISTS `payment_orders` (
+  `id` varchar(36) NOT NULL,
+  `user_id` varchar(36) NOT NULL,
+  `package_id` int DEFAULT NULL,
+  `product_id` varchar(50) DEFAULT NULL,
+  `package_name` varchar(255) DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `currency` varchar(10) DEFAULT 'CNY',
+  `points` int NOT NULL DEFAULT '0',
+  `payment_method` varchar(20) DEFAULT 'apple_iap',
+  `status` varchar(20) DEFAULT 'pending',
+  `transaction_id` varchar(255) DEFAULT NULL,
+  `receipt` mediumtext,
+  `paid_at` datetime DEFAULT NULL,
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
 -- 12. 支付记录表
 -- ============================================
 CREATE TABLE IF NOT EXISTS `payment_records` (
@@ -634,6 +683,9 @@ CREATE TABLE IF NOT EXISTS `banners` (
 -- 适用于 MySQL 5.7.44
 -- 执行日期: 2026-05-16
 -- ============================================
+
+-- 0.0 添加 has_topup_history 字段（首充后打折用，price 计算依赖）
+ALTER TABLE users ADD COLUMN has_topup_history TINYINT DEFAULT 0 COMMENT '是否充值过（首充前/后系数）';
 
 -- 0. 添加 orders 表缺字段（total_price / cost_price / profit，订单业务用到）
 ALTER TABLE orders

@@ -317,6 +317,14 @@ try {
     require_once __DIR__ . '/routes/system.php';
     require_once __DIR__ . '/routes/install.php';
     
+    // ====================
+    // Webhook 路由（独立处理，不走 auth 也不走 API Key 中间件）
+    // ====================
+    if ($path === '/webhook/hero-sms' && $method === 'POST') {
+        require __DIR__ . '/webhook.php';
+        exit;
+    }
+
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
 

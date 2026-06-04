@@ -213,17 +213,17 @@ if (preg_match('/^\/orders\/(.+)\/activate$/', $path, $matches) && $method === '
         ]);
     }
 
-    // 通知 HeroSMS 开始等待短信
-    $heroStatusResult = $heroSMS->setStatus($result['heroOrderId'], 1);
-    if (!$heroStatusResult['success']) {
-        error_log("HeroSMS setStatus(1) failed for order $orderId: " . ($heroStatusResult['message'] ?? 'unknown'));
-        // 不阻塞流程，即使 setStatus 失败也继续
-    }
-
     $db->query(
         "UPDATE orders SET status = 'active', phone_number = ?, hero_order_id = ?, activated_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL 20 MINUTE) WHERE id = ?",
         [$result['phoneNumber'], $result['heroOrderId'], $orderId]
     );
+
+    // 通知 HeroSMS 开始等待短信（失败不阻塞，但记录日志）
+    $heroStatusResult = $heroSMS->setStatus($result['heroOrderId'], 1);
+    if (!$heroStatusResult['success']) {
+        error_log("HeroSMS setStatus(1) failed for order $orderId: " . ($heroStatusResult['message'] ?? 'unknown'));
+        // 即使 setStatus 失败也不回滚——号码已经分配，HeroSMS 端收短信仍会推 webhook
+    }
     
     $expiresAt = $db->query("SELECT expires_at FROM orders WHERE id = ?", [$orderId])->fetchColumn();
     

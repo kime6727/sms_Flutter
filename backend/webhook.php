@@ -19,8 +19,9 @@
  * }
  */
 
-// 设置错误报告
-error_reporting(0);
+// 启用错误报告（容器内 stderr 会被 dokploy 收集，便于排查）
+error_reporting(E_ALL);
+ini_set('display_errors', '0'); // 不直接输出到响应，避免影响 webhook 协议
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/lib/Database.php';

@@ -34,12 +34,12 @@ function getSecureUserId() {
 }
 
 /**
- * 从当前请求中获取用户ID（从token或参数）
+ * 从当前请求中获取用户ID（仅从 Token 解析）
+ *
+ * 安全修复：不再从 body/query 读取 user_id，防止越权
+ * 任何调用 getCurrentUserIdFromToken() 的代码必须使用有效 token
  */
 function getCurrentUserIdFromToken() {
-    global $db;
-    
-    // 先尝试从Authorization header获取
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (preg_match('/Bearer (.+)/', $authHeader, $matches)) {
         $tokenData = Auth::verifyToken($matches[1]);
@@ -47,17 +47,6 @@ function getCurrentUserIdFromToken() {
             return $tokenData['user_id'];
         }
     }
-    
-    // 再尝试从请求参数获取
-    $input = json_decode(file_get_contents('php://input'), true);
-    if (isset($input['user_id'])) {
-        return $input['user_id'];
-    }
-    
-    if (isset($_GET['user_id'])) {
-        return $_GET['user_id'];
-    }
-    
     return null;
 }
 
