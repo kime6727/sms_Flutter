@@ -195,31 +195,31 @@ if ($path === '/price/calculate' && $method === 'GET') {
 if ($path === '/stock' && $method === 'GET') {
     $serviceId = $_GET['service_id'] ?? null;
     $countryId = $_GET['country_id'] ?? null;
-    
+
     if (!$serviceId || !$countryId) {
         apiBadRequest('service_id 和 country_id 参数缺失');
     }
-    
+
+    // 用文件缓存代替 cache 表（避免依赖不存在的表）
     $cacheKey = "stock_{$serviceId}_{$countryId}";
-    $cached = $db->query("SELECT * FROM cache WHERE `key` = ? AND expires_at > NOW()", [$cacheKey])->fetch();
-    
-    if ($cached) {
-        echo json_encode(['success' => true, 'data' => json_decode($cached['value'], true)]);
-        exit;
+    $cacheFile = sys_get_temp_dir() . '/sms_stock_' . md5($cacheKey) . '.json';
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 60) {
+        $cached = json_decode(@file_get_contents($cacheFile), true);
+        if ($cached) {
+            echo json_encode(['success' => true, 'data' => $cached, 'cached' => true]);
+            exit;
+        }
     }
-    
+
     // 调 HeroSMS checkStock（方法名是 checkStock 不是 getStock，参数是 service_code + country_id）
     // serviceId 参数实际上前端传的是 service_id，需要 JOIN 一下拿到 service code
     $serviceRow = $db->query("SELECT code FROM services WHERE id = ?", [$serviceId])->fetch();
     $serviceCode = $serviceRow['code'] ?? $serviceId;
     $stock = $heroSMS->checkStock($serviceCode, intval($countryId));
-    
-    $db->query(
-        "INSERT INTO cache (key, value, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 60 SECOND)) 
-         ON DUPLICATE KEY UPDATE value = ?, expires_at = DATE_ADD(NOW(), INTERVAL 60 SECOND)",
-        [$cacheKey, json_encode($stock), json_encode($stock)]
-    );
-    
-    echo json_encode(['success' => true, 'data' => $stock]);
+
+    // 写到文件缓存
+    @file_put_contents($cacheFile, json_encode($stock));
+
+    echo json_encode(['success' => true, 'data' => $stock, 'cached' => false]);
     exit;
 }

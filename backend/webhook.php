@@ -23,6 +23,17 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '0'); // 不直接输出到响应，避免影响 webhook 协议
 
+// 临时调试：把异常 detail 写到 error log，webhook 协议对响应内容不敏感
+set_exception_handler(function ($e) {
+    error_log("[webhook] uncaught: " . get_class($e) . ": " . $e->getMessage() . " at " . basename($e->getFile()) . ":" . $e->getLine());
+    if (!headers_sent()) {
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode(['success' => false, 'error' => 'webhook_error', 'detail' => $e->getMessage()]);
+    exit;
+});
+
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/lib/Database.php';
 require_once __DIR__ . '/lib/HeroSMS.php';
