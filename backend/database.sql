@@ -483,12 +483,14 @@ CREATE TABLE IF NOT EXISTS `email_verification_codes` (
 -- ============================================
 CREATE TABLE IF NOT EXISTS `service_coefficients` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `name` varchar(100) NOT NULL,
-  `coefficient` decimal(5,2) NOT NULL DEFAULT '1.00',
-  `description` text,
+  `service_id` int DEFAULT NULL,
+  `coefficient_before` decimal(5,2) DEFAULT NULL COMMENT '首充前价格系数，NULL则用系统默认值',
+  `coefficient_after` decimal(5,2) DEFAULT NULL COMMENT '首充后价格系数，NULL则用系统默认值',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_service_id` (`service_id`),
+  KEY `idx_service_id` (`service_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -628,6 +630,14 @@ ALTER TABLE `service_countries`
   MODIFY COLUMN `price` decimal(10,4) DEFAULT '0.0000' COMMENT 'HeroSMS 返回的成本价(美元)',
   ADD COLUMN `stock` int NOT NULL DEFAULT '0' COMMENT '库存数量' AFTER `price`,
   ADD COLUMN `cost_points` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '用户需支付积分(根据 price × 汇率计算)' AFTER `stock`;
+
+-- Migration 2.4: migrations/fix_service_coefficients.sql
+-- 修正 service_coefficients 表：原 schema 错误地用了 (name, coefficient)，代码需要 service_id/coefficient_before/coefficient_after
+-- 已存在表需修复（Installer 会跳过"已存在"错误）
+ALTER TABLE `service_coefficients` ADD COLUMN `service_id` int DEFAULT NULL AFTER `id`;
+ALTER TABLE `service_coefficients` ADD COLUMN `coefficient_before` decimal(5,2) DEFAULT NULL AFTER `service_id`;
+ALTER TABLE `service_coefficients` ADD COLUMN `coefficient_after` decimal(5,2) DEFAULT NULL AFTER `coefficient_before`;
+ALTER TABLE `service_coefficients` ADD UNIQUE KEY `uk_service_id` (`service_id`);
 
 -- Migration 3: migrations/add_performance_indexes.sql
 -- 性能优化索引
