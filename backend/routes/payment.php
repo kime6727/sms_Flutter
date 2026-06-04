@@ -115,18 +115,28 @@ if ($path === '/sync' && $method === 'POST') {
                 $updated = 0;
                 $skipped = 0;
 
-                // SMS-Activate/HeroSMS 协议结构:
-                // {country_id: {service_code: {price_string: count}}}
-                // 注意：price 是 KEY (字符串)，count 是 VALUE
+                // SMS-Activate/HeroSMS 协议结构有两种格式:
+                // 1. {country_id: {service_code: {"cost": 0.15, "count": 244}}}
+                // 2. {country_id: {service_code: {"2.50": 1873}}}  (price 是 KEY)
                 foreach ($prices as $countryHeroId => $serviceMap) {
                     if (!is_array($serviceMap)) continue;
                     foreach ($serviceMap as $serviceCode => $priceData) {
                         if (!is_array($priceData) || empty($priceData)) continue;
-                        // priceData = {price_str: count}
-                        // 取第一个 key 作为价格
-                        $costKey = array_key_first($priceData);
-                        $cost = floatval($costKey);
-                        $count = intval($priceData[$costKey] ?? 0);
+                        $cost = 0;
+                        $count = 0;
+                        // 格式 1: cost 是字段
+                        if (isset($priceData['cost'])) {
+                            $cost = floatval($priceData['cost']);
+                            $count = intval($priceData['count'] ?? 0);
+                        } else {
+                            // 格式 2: price 是 KEY, count 是 VALUE
+                            $costKey = array_key_first($priceData);
+                            if ($costKey !== null) {
+                                $cost = floatval($costKey);
+                                $count = intval($priceData[$costKey] ?? 0);
+                            }
+                        }
+                        if ($cost <= 0) continue;  // 跳过无价记录
 
                         $svcRow = $db->query("SELECT id FROM services WHERE hero_service_id = ? LIMIT 1", [(string)$serviceCode])->fetch();
                         $ctyRow = $db->query("SELECT id FROM countries WHERE hero_country_id = ? LIMIT 1", [(string)$countryHeroId])->fetch();
