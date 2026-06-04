@@ -1,243 +1,393 @@
 <?php
 /**
  * 服务配置页面 - 完整重写
- * 支持从HeroSMS同步服务，并管理上架/下架
+ * 支持从 HeroSMS 同步服务、本地上下架管理
  */
 
 require_once __DIR__ . '/../../lib/HeroSMS.php';
 require_once __DIR__ . '/../../lib/KeyManager.php';
 
-// 处理一键同步 - 强制保存所有数据
+// ==================== 自愈：确保 services 表关键字段存在 ====================
+try {
+    $svcCols = array_column($db->query("SHOW COLUMNS FROM services")->fetchAll(), 'Field');
+    if (!in_array('is_pinned', $svcCols)) {
+        $db->query("ALTER TABLE services ADD COLUMN `is_pinned` tinyint DEFAULT '0' COMMENT '是否置顶显示' AFTER `sort_order`");
+    }
+    if (!in_array('tag', $svcCols)) {
+        $db->query("ALTER TABLE services ADD COLUMN `tag` tinyint DEFAULT '0' COMMENT '标签: 0=无 1=热门 2=推荐' AFTER `is_pinned`");
+    }
+    if (!in_array('name_en', $svcCols)) {
+        $db->query("ALTER TABLE services ADD COLUMN `name_en` varchar(255) DEFAULT NULL AFTER `name`");
+    }
+    if (!in_array('name_cn', $svcCols)) {
+        $db->query("ALTER TABLE services ADD COLUMN `name_cn` varchar(255) DEFAULT NULL AFTER `name_en`");
+    }
+    // 索引自愈
+    $svcIndexes = array_column($db->query("SHOW INDEX FROM services")->fetchAll(), 'Key_name');
+    if (!in_array('idx_pinned', $svcIndexes)) {
+        $db->query("ALTER TABLE services ADD KEY `idx_pinned` (`is_pinned`)");
+    }
+    if (!in_array('uk_hero_service_id', $svcIndexes)) {
+        $db->query("ALTER TABLE services ADD UNIQUE KEY `uk_hero_service_id` (`hero_service_id`)");
+    }
+} catch (Exception $e) {
+    $schemaError = 'services 表结构自愈失败: ' . $e->getMessage();
+}
+
+// ==================== 同步服务列表 ====================
 if (($_GET['action'] ?? '') === 'sync_all') {
     $heroSmsApiKey = KeyManager::getHeroSmsApiKey();
     if (empty($heroSmsApiKey)) {
-        die("ERROR: hero-sms API key is not set in database");
-    }
-    $heroSMS = new HeroSMS($heroSmsApiKey, HEROSMS_BASE_URL);
-    $syncedServices = 0;
-    $syncedCountries = 0;
-    $syncedPrices = 0;
+        $error = "HeroSMS API key 未配置";
+    } else {
+        $heroSMS = new HeroSMS($heroSmsApiKey, HEROSMS_BASE_URL);
+        $syncedServices = 0;
+        $updatedServices = 0;
 
-    // 1. 同步服务列表 - REPLACE方式直接覆盖
-    $result = $heroSMS->getServicesList();
-    if ($result['success'] && !empty($result['services'])) {
-        foreach ($result['services'] as $s) {
-            $existing = $db->query("SELECT id, is_published FROM services WHERE hero_service_id = ?", [$s['id']])->fetch();
-            if ($existing) {
-                // 更新，但保留is_published状态
-                $db->query(
-                    "UPDATE services SET name = ?, name_en = ?, name_cn = ?, code = ?, icon = ?, active = 1 WHERE hero_service_id = ?",
-                    [$s['name'], $s['name'], $s['name'], $s['code'] ?? $s['id'], $s['icon'] ?? '', $s['id']]
-                );
-            } else {
-                $db->insert('services', [
-                    'hero_service_id' => $s['id'],
-                    'name' => $s['name'],
-                    'name_en' => $s['name'],
-                    'name_cn' => $s['name'],
-                    'code' => $s['code'] ?? $s['id'],
-                    'icon' => $s['icon'] ?? '',
-                    'active' => 1,
-                    'is_published' => 0,
-                    'sort_order' => intval($s['id']),
-                    'created_at' => date('Y-m-d H:i:s')
-                ]);
-                $syncedServices++;
-            }
-        }
-    }
-
-    // 2. 同步国家列表 - 直接插入/更新
-    $countriesResult = $heroSMS->getCountriesList();
-    if ($countriesResult['success'] && !empty($countriesResult['countries'])) {
-        foreach ($countriesResult['countries'] as $c) {
-            $existing = $db->query("SELECT id FROM countries WHERE hero_country_id = ?", [$c['id']])->fetch();
-            if ($existing) {
-                $db->query(
-                    "UPDATE countries SET name = ?, name_en = ?, name_cn = ?, code = ?, flag = ?, phone_code = ?, active = 1 WHERE hero_country_id = ?",
-                    [$c['name'], $c['name'], $c['name'], $c['code'] ?? '', $c['flag'] ?? '🏳️', $c['phone_code'] ?? '', $c['id']]
-                );
-            } else {
-                $db->insert('countries', [
-                    'hero_country_id' => $c['id'],
-                    'name' => $c['name'],
-                    'name_en' => $c['name'],
-                    'name_cn' => $c['name'],
-                    'code' => $c['code'] ?? '',
-                    'flag' => $c['flag'] ?? '🏳️',
-                    'phone_code' => $c['phone_code'] ?? '',
-                    'active' => 1,
-                    'sort_order' => 0,
-                    'created_at' => date('Y-m-d H:i:s')
-                ]);
-                $syncedCountries++;
-            }
-        }
-    }
-
-    // 3. 同步服务-国家价格 - 批量更新/插入
-    $pricesResult = $heroSMS->getPrices();
-    if ($pricesResult['success'] && !empty($pricesResult['prices'])) {
-        foreach ($pricesResult['prices'] as $price) {
-            $service = $db->query("SELECT id FROM services WHERE hero_service_id = ?", [$price['service_id']])->fetch();
-            $country = $db->query("SELECT id FROM countries WHERE hero_country_id = ?", [$price['country_id']])->fetch();
-
-            if ($service && $country) {
-                $existing = $db->query(
-                    "SELECT id, is_published FROM service_countries WHERE service_id = ? AND country_id = ?",
-                    [$service['id'], $country['id']]
-                )->fetch();
-
+        // getServicesList 返回结构: [{code, name}, ...]
+        $result = $heroSMS->getServicesList();
+        if ($result['success'] && !empty($result['services'])) {
+            foreach ($result['services'] as $s) {
+                if (!is_array($s) || empty($s['code'])) continue;
+                $code = (string)$s['code'];
+                $name = $s['name'] ?? $code;
+                $existing = $db->query("SELECT id, is_published FROM services WHERE hero_service_id = ?", [$code])->fetch();
                 if ($existing) {
-                    // 更新价格，但保留is_published状态
+                    // 更新（保留 is_published 状态）
                     $db->query(
-                        "UPDATE service_countries SET price = ?, active = 1 WHERE service_id = ? AND country_id = ?",
-                        [$price['price'], $service['id'], $country['id']]
+                        "UPDATE services SET name = ?, name_en = ?, name_cn = ?, code = ?, is_active = 1, updated_at = NOW() WHERE hero_service_id = ?",
+                        [$name, $name, $name, $code, $code]
                     );
+                    $updatedServices++;
                 } else {
-                    $db->insert('service_countries', [
-                        'service_id' => $service['id'],
-                        'country_id' => $country['id'],
-                        'price' => $price['price'],
-                        'active' => 1,
-                        'is_published' => 0,
-                        'is_auto' => 0,
-                        'created_at' => date('Y-m-d H:i:s')
+                    // 首次插入，默认上架
+                    $db->insert('services', [
+                        'hero_service_id' => $code,
+                        'name' => $name,
+                        'name_en' => $name,
+                        'name_cn' => $name,
+                        'code' => $code,
+                        'is_published' => 1,
+                        'is_active' => 1,
+                        'sort_order' => 100,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
                     ]);
-                    $syncedPrices++;
+                    $syncedServices++;
                 }
             }
         }
-    }
 
-    $success = "同步完成！新增服务: $syncedServices, 新增国家: $syncedCountries, 新增价格: $syncedPrices (价格已更新)";
+        // 同步国家（用于 service_countries）
+        $syncedCountries = 0;
+        $updatedCountries = 0;
+        $countriesResult = $heroSMS->getCountries();
+        if (!empty($countriesResult['countries'])) {
+            foreach ($countriesResult['countries'] as $id => $info) {
+                if (!is_array($info)) continue;
+                $heroCid = (string)($info['id'] ?? $id);
+                $eng = $info['eng'] ?? '';
+                $chn = $info['chn'] ?? '';
+                $rus = $info['rus'] ?? '';
+                $displayName = $chn ?: $eng ?: $rus ?: ('Country_' . $id);
+                $code = strtolower(substr($eng, 0, 10));
+                $existing = $db->query("SELECT id FROM countries WHERE hero_country_id = ?", [$heroCid])->fetch();
+                if ($existing) {
+                    $db->query(
+                        "UPDATE countries SET name = ?, name_en = ?, name_cn = ?, code = ?, active = 1 WHERE hero_country_id = ?",
+                        [$displayName, $eng, $chn, $code, $heroCid]
+                    );
+                    $updatedCountries++;
+                } else {
+                    $db->insert('countries', [
+                        'hero_country_id' => $heroCid,
+                        'name' => $displayName,
+                        'name_en' => $eng,
+                        'name_cn' => $chn,
+                        'code' => $code,
+                        'active' => 1,
+                        'sort_order' => 0,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                    $syncedCountries++;
+                }
+            }
+        }
+
+        // 同步价格（service_countries）
+        $syncedPrices = 0;
+        $pricesResult = $heroSMS->getPrices();
+        if (!empty($pricesResult['success']) && !empty($pricesResult['prices'])) {
+            foreach ($pricesResult['prices'] as $countryHeroId => $serviceMap) {
+                if (!is_array($serviceMap)) continue;
+                foreach ($serviceMap as $serviceCode => $priceData) {
+                    if (!is_array($priceData) || empty($priceData)) continue;
+                    $cost = 0;
+                    $count = 0;
+                    if (isset($priceData['cost'])) {
+                        $cost = floatval($priceData['cost']);
+                        $count = intval($priceData['count'] ?? 0);
+                    } else {
+                        $costKey = array_key_first($priceData);
+                        if ($costKey !== null) {
+                            $cost = floatval($costKey);
+                            $count = intval($priceData[$costKey] ?? 0);
+                        }
+                    }
+                    if ($cost <= 0) continue;
+
+                    $svc = $db->query("SELECT id FROM services WHERE hero_service_id = ?", [(string)$serviceCode])->fetch();
+                    $cty = $db->query("SELECT id FROM countries WHERE hero_country_id = ?", [(string)$countryHeroId])->fetch();
+                    if (!$svc || !$cty) continue;
+
+                    $exist = $db->query("SELECT id FROM service_countries WHERE service_id = ? AND country_id = ?", [$svc['id'], $cty['id']])->fetch();
+                    if ($exist) {
+                        $db->query("UPDATE service_countries SET price = ?, stock = ?, is_active = 1, updated_at = NOW() WHERE id = ?", [$cost, $count, $exist['id']]);
+                    } else {
+                        $db->insert('service_countries', [
+                            'service_id' => $svc['id'],
+                            'country_id' => $cty['id'],
+                            'price' => $cost,
+                            'stock' => $count,
+                            'is_published' => 1,
+                            'is_active' => 1,
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s'),
+                        ]);
+                        $syncedPrices++;
+                    }
+                }
+            }
+        }
+
+        $success = "同步完成：新增服务 {$syncedServices}、更新 {$updatedServices}；新增国家 {$syncedCountries}、更新 {$updatedCountries}；新增价格 {$syncedPrices}";
+    }
 }
 
-// 处理批量操作（AJAX/POST）
-if (($_POST['action'] ?? '') === 'batch_publish' && !empty($_POST['ids'])) {
-    $rawIds = explode(',', $_POST['ids']);
+// ==================== 批量操作 ====================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['ajax'])) {
+    header('Content-Type: application/json');
+    $action = $_POST['action'] ?? '';
+    $rawIds = explode(',', $_POST['ids'] ?? '');
     $ids = array_filter(array_map('intval', $rawIds));
-    if (!empty($ids)) {
-        $idList = implode(',', $ids);
-        $db->query("UPDATE services SET is_published = 1 WHERE id IN ($idList)");
-    }
-    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'count' => count($ids)]);
+
+    if (empty($ids)) {
+        echo json_encode(['success' => false, 'error' => '未选择项目']);
         exit;
     }
-    header('Location: ?page=services&msg=' . urlencode("已上架 " . count($ids) . " 个服务"));
-    exit;
-}
-if (($_POST['action'] ?? '') === 'batch_unpublish' && !empty($_POST['ids'])) {
-    $rawIds = explode(',', $_POST['ids']);
-    $ids = array_filter(array_map('intval', $rawIds));
-    if (!empty($ids)) {
-        $idList = implode(',', $ids);
-        $db->query("UPDATE services SET is_published = 0 WHERE id IN ($idList)");
+    $idList = implode(',', $ids);
+
+    switch ($action) {
+        case 'batch_publish':
+            $db->query("UPDATE services SET is_published = 1 WHERE id IN ($idList)");
+            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已上架']);
+            break;
+        case 'batch_unpublish':
+            $db->query("UPDATE services SET is_published = 0 WHERE id IN ($idList)");
+            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已下架']);
+            break;
+        case 'batch_pin':
+            $db->query("UPDATE services SET is_pinned = 1 WHERE id IN ($idList)");
+            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已置顶']);
+            break;
+        case 'batch_unpin':
+            $db->query("UPDATE services SET is_pinned = 0 WHERE id IN ($idList)");
+            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已取消置顶']);
+            break;
+        case 'batch_set_tag':
+            $tag = intval($_POST['tag'] ?? 0);
+            $db->query("UPDATE services SET tag = ? WHERE id IN ($idList)", [$tag]);
+            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => "已设标签={$tag}"]);
+            break;
+        case 'batch_set_coefficient':
+            $coef = floatval($_POST['coefficient'] ?? 0);
+            // 这里用 system_settings 全局配置
+            $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_after'", [(string)$coef]);
+            echo json_encode(['success' => true, 'msg' => "全局系数已设为 {$coef}"]);
+            break;
+        case 'toggle_publish':
+            $id = intval($_POST['id']);
+            $cur = $db->query("SELECT is_published FROM services WHERE id = ?", [$id])->fetch();
+            if ($cur) {
+                $new = $cur['is_published'] ? 0 : 1;
+                $db->query("UPDATE services SET is_published = ? WHERE id = ?", [$new, $id]);
+                echo json_encode(['success' => true, 'is_published' => $new]);
+            } else {
+                echo json_encode(['success' => false, 'error' => '服务不存在']);
+            }
+            break;
+        case 'update_service':
+            $id = intval($_POST['id']);
+            $name_cn = $_POST['name_cn'] ?? '';
+            $name_en = $_POST['name_en'] ?? '';
+            $sort_order = intval($_POST['sort_order'] ?? 0);
+            $is_pinned = intval($_POST['is_pinned'] ?? 0);
+            $tag = intval($_POST['tag'] ?? 0);
+            $db->query(
+                "UPDATE services SET name_cn = ?, name_en = ?, sort_order = ?, is_pinned = ?, tag = ? WHERE id = ?",
+                [$name_cn, $name_en, $sort_order, $is_pinned, $tag, $id]
+            );
+            echo json_encode(['success' => true]);
+            break;
+        case 'delete_service':
+            $id = intval($_POST['id']);
+            $db->query("DELETE FROM service_countries WHERE service_id = ?", [$id]);
+            $db->query("DELETE FROM services WHERE id = ?", [$id]);
+            echo json_encode(['success' => true]);
+            break;
+        default:
+            echo json_encode(['success' => false, 'error' => '未知操作: ' . $action]);
     }
-    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'count' => count($ids)]);
-        exit;
-    }
-    header('Location: ?page=services&msg=' . urlencode("已下架 " . count($ids) . " 个服务"));
     exit;
 }
 
-// 处理服务上架/下架
-if (($_GET['action'] ?? '') === 'toggle_publish' && ($_GET['id'] ?? null)) {
-    $id = intval($_GET['id']);
-    $current = $db->query("SELECT is_published FROM services WHERE id = ?", [$id])->fetch();
-    if ($current) {
-        $newStatus = $current['is_published'] ? 0 : 1;
-        $db->query("UPDATE services SET is_published = ? WHERE id = ?", [$newStatus, $id]);
-    }
-    header('Location: ?page=services');
-    exit;
+// ==================== 获取数据 ====================
+// 筛选参数
+$search = trim($_GET['q'] ?? '');
+$filter = $_GET['filter'] ?? 'all'; // all / published / unpublished / pinned / hot / recommended
+$tagFilter = intval($_GET['tag'] ?? -1);
+
+$where = ['1=1'];
+$params = [];
+if ($search !== '') {
+    $where[] = '(s.name LIKE ? OR s.name_cn LIKE ? OR s.name_en LIKE ? OR s.hero_service_id LIKE ? OR s.code LIKE ?)';
+    $s = "%$search%";
+    $params = array_merge($params, [$s, $s, $s, $s, $s]);
+}
+if ($filter === 'published') $where[] = 's.is_published = 1';
+if ($filter === 'unpublished') $where[] = 's.is_published = 0';
+if ($filter === 'pinned') $where[] = 's.is_pinned = 1';
+if ($tagFilter >= 0) $where[] = 's.tag = ' . $tagFilter;
+
+$whereSql = implode(' AND ', $where);
+
+try {
+    $services = $db->query(
+        "SELECT s.*,
+                (SELECT COUNT(*) FROM service_countries sc WHERE sc.service_id = s.id AND sc.is_published = 1) as published_countries,
+                (SELECT COUNT(*) FROM service_countries sc WHERE sc.service_id = s.id) as total_countries
+         FROM services s WHERE $whereSql
+         ORDER BY s.is_pinned DESC, s.is_published DESC, s.tag DESC, s.sort_order ASC, s.id ASC"
+    )->fetchAll();
+    $queryError = null;
+} catch (Exception $e) {
+    $services = [];
+    $queryError = $e->getMessage();
 }
 
-// 处理服务名称更新（AJAX）
-if (($_POST['action'] ?? '') === 'update_service' && ($_POST['id'] ?? null)) {
-    $db->query(
-        "UPDATE services SET name_cn = ?, name_en = ?, sort_order = ?, is_pinned = ?, tag = ? WHERE id = ?",
-        [$_POST['name_cn'], $_POST['name_en'], intval($_POST['sort_order']), intval($_POST['is_pinned'] ?? 0), intval($_POST['tag'] ?? 0), intval($_POST['id'])]
-    );
-    // AJAX返回JSON，否则redirect
-    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true]);
-        exit;
-    }
-    header('Location: ?page=services&msg=' . urlencode("服务信息已更新"));
-    exit;
-}
-
-// 获取服务列表（包含统计）
-$services = $db->query(
-    "SELECT s.*,
-            (SELECT COUNT(*) FROM service_countries sc WHERE sc.service_id = s.id AND sc.is_published = 1) as published_countries,
-            (SELECT COUNT(*) FROM service_countries sc WHERE sc.service_id = s.id) as total_countries
-     FROM services s ORDER BY s.is_pinned DESC, s.is_published DESC, s.sort_order ASC"
-)->fetchAll();
+$total = count($services);
+$totalPublished = count(array_filter($services, fn($s) => $s['is_published']));
+$totalPinned = count(array_filter($services, fn($s) => $s['is_pinned']));
+$totalTagHot = count(array_filter($services, fn($s) => $s['tag'] == 1));
+$totalTagRec = count(array_filter($services, fn($s) => $s['tag'] == 2));
 
 $msg = $_GET['msg'] ?? '';
 ?>
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
     <h4 style="margin:0;">⚙️ 服务配置</h4>
     <div style="display:flex;gap:12px;">
-        <a href="?page=services&action=sync_all" onclick="return confirm('确定要从HeroSMS同步所有服务和国家数据吗？')" style="background:#10b981;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;">🔄 一键同步HeroSMS</a>
+        <a href="?page=services&action=sync_all" onclick="return confirm('确定要从 HeroSMS 同步所有服务/国家/价格数据吗？\n\n- 已有服务会更新名称（保留上架/置顶状态）\n- 新增服务默认自动上架\n- 同步过程可能需要 1-2 分钟')" style="background:#10b981;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;">🔄 同步 HeroSMS</a>
     </div>
 </div>
 
 <?php if(isset($success)): ?>
 <div style="background:#d1fae5;color:#065f46;padding:14px 20px;border-radius:8px;margin-bottom:20px;font-size:14px;">✓ <?= htmlspecialchars($success) ?></div>
 <?php endif; ?>
-<?php if($msg): ?>
-<div style="background:#d1fae5;color:#065f46;padding:14px 20px;border-radius:8px;margin-bottom:20px;font-size:14px;">✓ <?= htmlspecialchars($msg) ?></div>
-<?php endif; ?>
 <?php if(isset($error)): ?>
 <div style="background:#fee2e2;color:#991b1b;padding:14px 20px;border-radius:8px;margin-bottom:20px;font-size:14px;">✗ <?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
+<?php if(!empty($schemaError)): ?>
+<div style="background:#fef3c7;color:#92400e;padding:14px 20px;border-radius:8px;margin-bottom:20px;font-size:14px;">⚠️ <?= htmlspecialchars($schemaError) ?></div>
+<?php endif; ?>
+<?php if(!empty($queryError)): ?>
+<div style="background:#fee2e2;color:#991b1b;padding:14px 20px;border-radius:8px;margin-bottom:20px;font-size:14px;">
+    <div style="font-weight:600;margin-bottom:6px;">✗ 数据查询失败</div>
+    <div style="font-family:monospace;font-size:12px;background:#fff5f5;padding:8px 12px;border-radius:6px;margin-top:6px;"><?= htmlspecialchars($queryError) ?></div>
+    <div style="margin-top:10px;font-size:13px;">请检查 services 表是否存在，以及 <code>is_pinned</code> / <code>tag</code> / <code>name_en</code> / <code>name_cn</code> 字段是否齐全。可在 SQL 编辑器执行：</div>
+    <pre style="background:#1e293b;color:#e2e8f0;padding:12px;border-radius:6px;margin-top:8px;font-size:12px;overflow-x:auto;">ALTER TABLE services
+  ADD COLUMN is_pinned tinyint DEFAULT 0 AFTER sort_order,
+  ADD COLUMN tag tinyint DEFAULT 0 AFTER is_pinned,
+  ADD COLUMN name_en varchar(255) DEFAULT NULL AFTER name,
+  ADD COLUMN name_cn varchar(255) DEFAULT NULL AFTER name_en;</pre>
+</div>
+<?php endif; ?>
+<?php if($msg): ?>
+<div style="background:#d1fae5;color:#065f46;padding:14px 20px;border-radius:8px;margin-bottom:20px;font-size:14px;">✓ <?= htmlspecialchars($msg) ?></div>
+<?php endif; ?>
 
-<form id="batchForm" method="POST">
-    <input type="hidden" name="action" id="batchAction" value="">
-    <input type="hidden" name="ids" id="batchIds" value="">
-</form>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;">
+    <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-size:12px;color:#64748b;">总数</div>
+        <div style="font-size:24px;font-weight:700;color:#0f172a;"><?= $total ?></div>
+    </div>
+    <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-size:12px;color:#64748b;">已上架</div>
+        <div style="font-size:24px;font-weight:700;color:#10b981;"><?= $totalPublished ?></div>
+    </div>
+    <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-size:12px;color:#64748b;">置顶</div>
+        <div style="font-size:24px;font-weight:700;color:#f59e0b;"><?= $totalPinned ?></div>
+    </div>
+    <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-size:12px;color:#ef4444;">🔥 热门</div>
+        <div style="font-size:24px;font-weight:700;color:#ef4444;"><?= $totalTagHot ?></div>
+    </div>
+    <div class="card" style="padding:14px;text-align:center;">
+        <div style="font-size:12px;color:#f59e0b;">⭐ 推荐</div>
+        <div style="font-size:24px;font-weight:700;color:#f59e0b;"><?= $totalTagRec ?></div>
+    </div>
+</div>
+
+<div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <input type="text" id="searchInput" placeholder="🔍 搜索服务名/HeroID/code..." value="<?= htmlspecialchars($search) ?>" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+    <select id="filterSelect" onchange="applyFilter()" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+        <option value="all" <?= $filter==='all'?'selected':'' ?>>全部状态</option>
+        <option value="published" <?= $filter==='published'?'selected':'' ?>>已上架</option>
+        <option value="unpublished" <?= $filter==='unpublished'?'selected':'' ?>>未上架</option>
+        <option value="pinned" <?= $filter==='pinned'?'selected':'' ?>>已置顶</option>
+    </select>
+    <select id="tagSelect" onchange="applyFilter()" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+        <option value="-1" <?= $tagFilter===-1?'selected':'' ?>>全部标签</option>
+        <option value="0" <?= $tagFilter===0?'selected':'' ?>>-无标签-</option>
+        <option value="1" <?= $tagFilter===1?'selected':'' ?>>🔥 热门</option>
+        <option value="2" <?= $tagFilter===2?'selected':'' ?>>⭐ 推荐</option>
+    </select>
+</div>
 
 <div class="card">
     <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div style="display:flex;align-items:center;gap:16px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
-                <input type="checkbox" id="selectAll" onchange="toggleAllServices(this.checked)" style="transform:scale(1.2);">
+                <input type="checkbox" id="selectAll" onchange="toggleAll(this.checked)" style="transform:scale(1.2);">
                 全选
             </label>
             <span style="font-weight:600;color:#0f172a;">服务列表</span>
-            <span style="margin-left:8px;padding:2px 10px;background:#e0e7ff;color:#4f46e5;border-radius:12px;font-size:13px;font-weight:500;">
-                <?= count($services) ?> 个服务
-            </span>
             <span id="selectedCount" style="display:none;margin-left:8px;padding:2px 10px;background:#fef3c7;color:#92400e;border-radius:12px;font-size:13px;font-weight:500;">
                 已选 <strong id="selectedNum">0</strong> 项
             </span>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-            <button type="button" onclick="batchAction('batch_publish')" style="background:#6366f1;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">✅ 批量上架</button>
-            <button type="button" onclick="batchAction('batch_unpublish')" style="background:#fef3c7;color:#92400e;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">⏸ 批量下架</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" onclick="batchAction('batch_publish')" style="background:#10b981;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">✅ 批量上架</button>
+            <button type="button" onclick="batchAction('batch_unpublish')" style="background:#94a3b8;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">⏸ 批量下架</button>
+            <button type="button" onclick="batchAction('batch_pin')" style="background:#f59e0b;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">📌 置顶</button>
+            <button type="button" onclick="batchAction('batch_unpin')" style="background:#cbd5e1;color:#475569;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">取消置顶</button>
+            <button type="button" onclick="setTagToSelected(1)" style="background:#ef4444;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">🔥 标热门</button>
+            <button type="button" onclick="setTagToSelected(2)" style="background:#f59e0b;color:white;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">⭐ 标推荐</button>
+            <button type="button" onclick="setTagToSelected(0)" style="background:#e2e8f0;color:#475569;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;">清标签</button>
         </div>
     </div>
     <table>
         <thead>
             <tr>
-                <th style="width:40px;"><input type="checkbox" id="selectAllHeader" onchange="toggleAllServices(this.checked)" style="transform:scale(1.2);"></th>
+                <th style="width:40px;"><input type="checkbox" id="selectAllHeader" onchange="toggleAll(this.checked)" style="transform:scale(1.2);"></th>
+                <th style="width:50px;">ID</th>
                 <th style="width:60px;">排序</th>
-                <th style="width:50px;">图标</th>
-                <th>HeroID</th>
-                <th>服务名称</th>
-                <th>中文名</th>
-                <th>英文名</th>
-                <th style="text-align:center;">国家数</th>
-                <th style="text-align:center;">已上架</th>
+                <th>HeroID/code</th>
+                <th>名称(英)</th>
+                <th>名称(中)</th>
+                <th style="text-align:center;">国家</th>
                 <th style="text-align:center;">置顶</th>
                 <th style="text-align:center;">标签</th>
                 <th style="text-align:center;">状态</th>
@@ -246,84 +396,55 @@ $msg = $_GET['msg'] ?? '';
         </thead>
         <tbody>
             <?php if(empty($services)): ?>
-            <tr>
-                <td colspan="13" style="text-align:center;color:#64748b;padding:60px;">
-                    <div style="font-size:48px;margin-bottom:16px;">📦</div>
-                    <div style="margin-bottom:12px;">暂无服务数据</div>
-                    <div style="font-size:13px;">点击右上角「一键同步HeroSMS」获取服务列表</div>
-                </td>
-            </tr>
-            <?php else: ?>
-            <?php foreach($services as $service): ?>
-            <tr style="<?= !$service['is_published'] ? 'opacity:0.6;' : '' ?>">
+            <tr><td colspan="11" style="text-align:center;color:#64748b;padding:60px;">
+                <div style="font-size:48px;margin-bottom:16px;">📦</div>
+                <div style="margin-bottom:12px;">暂无服务数据</div>
+                <div style="font-size:13px;">点击右上角「同步 HeroSMS」获取服务列表</div>
+            </td></tr>
+            <?php else: foreach($services as $s): ?>
+            <tr style="<?= !$s['is_published'] ? 'opacity:0.5;' : '' ?><?= $s['is_pinned'] ? 'background:#fffbeb;' : '' ?>" data-id="<?= $s['id'] ?>">
+                <td><input type="checkbox" class="row-cb" value="<?= $s['id'] ?>" onchange="updateCount()"></td>
+                <td style="color:#64748b;font-size:12px;"><?= $s['id'] ?></td>
+                <td><input type="number" class="field-input" data-field="sort_order" data-id="<?= $s['id'] ?>" value="<?= $s['sort_order'] ?: 100 ?>" style="width:50px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;"></td>
                 <td>
-                    <input type="checkbox" class="service-checkbox" value="<?= $service['id'] ?>" onchange="updateSelectedCount()" style="transform:scale(1.2);">
+                    <small style="color:#64748b;background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;"><?= htmlspecialchars($s['hero_service_id']) ?></small>
                 </td>
-                <td>
-                    <input type="number" class="inline-edit" data-field="sort_order" data-id="<?= $service['id'] ?>" value="<?= $service['sort_order'] ?: 0 ?>" style="width:50px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:4px;font-size:12px;text-align:center;">
-                </td>
-                <td>
-                    <?php 
-                    $iconUrl = '';
-                    if (!empty($service['icon'])) {
-                        $cdnBase = 'https://cdn.hero-sms.com/assets/img/service/';
-                        if (strpos($service['icon'], $cdnBase) === 0) {
-                            $filename = substr($service['icon'], strlen($cdnBase));
-                            $iconUrl = '../../pic/fuwu/' . htmlspecialchars($filename);
-                        } elseif (strpos($service['icon'], '/pic/fuwu/') !== false) {
-                            $iconUrl = htmlspecialchars($service['icon']);
-                        } else {
-                            $iconUrl = htmlspecialchars($service['icon']);
-                        }
-                    }
-                    ?>
-                    <?php if(!empty($iconUrl)): ?>
-                    <img src="<?= $iconUrl ?>" style="width:28px;height:28px;border-radius:6px;object-fit:contain;" onerror="this.style.display='none'">
-                    <?php endif; ?>
-                </td>
-                <td><small style="color:#64748b;background:#f1f5f9;padding:2px 6px;border-radius:4px;"><?= htmlspecialchars($service['hero_service_id']) ?></small></td>
-                <td>
-                    <div style="font-weight:500;"><?= htmlspecialchars($service['name']) ?></div>
-                    <div style="font-size:11px;color:#94a3b8;"><?= htmlspecialchars($service['code'] ?? '') ?></div>
-                </td>
-                <td>
-                    <input type="text" class="inline-edit" data-field="name_cn" data-id="<?= $service['id'] ?>" value="<?= htmlspecialchars($service['name_cn'] ?? '') ?>" style="width:100px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
-                </td>
-                <td>
-                    <input type="text" class="inline-edit" data-field="name_en" data-id="<?= $service['id'] ?>" value="<?= htmlspecialchars($service['name_en'] ?? '') ?>" style="width:100px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
-                </td>
-                <td style="text-align:center;"><span style="color:#64748b;"><?= $service['total_countries'] ?></span></td>
-                <td style="text-align:center;"><span style="color:#10b981;font-weight:600;"><?= $service['published_countries'] ?></span></td>
+                <td><input type="text" class="field-input" data-field="name_en" data-id="<?= $s['id'] ?>" value="<?= htmlspecialchars($s['name_en'] ?? $s['name'] ?? '') ?>" style="width:140px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;"></td>
+                <td><input type="text" class="field-input" data-field="name_cn" data-id="<?= $s['id'] ?>" value="<?= htmlspecialchars($s['name_cn'] ?? '') ?>" style="width:120px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;" placeholder="中文名"></td>
                 <td style="text-align:center;">
-                    <input type="checkbox" class="inline-toggle" data-field="is_pinned" data-id="<?= $service['id'] ?>" value="1" <?= $service['is_pinned'] ? 'checked' : '' ?> style="transform:scale(1.2);">
+                    <span style="color:#10b981;font-weight:600;"><?= $s['published_countries'] ?></span>
+                    <span style="color:#cbd5e1;">/</span>
+                    <span style="color:#64748b;"><?= $s['total_countries'] ?></span>
                 </td>
                 <td style="text-align:center;">
-                    <select class="inline-edit" data-field="tag" data-id="<?= $service['id'] ?>" style="padding:4px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;">
-                        <option value="0" <?= $service['tag']==0?'selected':'' ?>>-无-</option>
-                        <option value="1" <?= $service['tag']==1?'selected':'' ?> style="color:#ef4444;">🔥 热门</option>
-                        <option value="2" <?= $service['tag']==2?'selected':'' ?> style="color:#f59e0b;">⭐ 推荐</option>
+                    <input type="checkbox" class="field-toggle" data-field="is_pinned" data-id="<?= $s['id'] ?>" <?= $s['is_pinned'] ? 'checked' : '' ?> style="transform:scale(1.2);">
+                </td>
+                <td style="text-align:center;">
+                    <select class="field-input" data-field="tag" data-id="<?= $s['id'] ?>" style="padding:4px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;">
+                        <option value="0" <?= $s['tag']==0?'selected':'' ?>>-</option>
+                        <option value="1" <?= $s['tag']==1?'selected':'' ?> style="color:#ef4444;">🔥</option>
+                        <option value="2" <?= $s['tag']==2?'selected':'' ?> style="color:#f59e0b;">⭐</option>
                     </select>
                 </td>
                 <td style="text-align:center;">
-                    <?php if($service['is_published']): ?>
-                    <span style="background:#d1fae5;color:#065f46;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;">已上架</span>
+                    <?php if($s['is_published']): ?>
+                        <span style="background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">已上架</span>
                     <?php else: ?>
-                    <span style="background:#f1f5f9;color:#64748b;padding:4px 10px;border-radius:12px;font-size:12px;">未上架</span>
+                        <span style="background:#f1f5f9;color:#64748b;padding:3px 10px;border-radius:12px;font-size:11px;">已下架</span>
                     <?php endif; ?>
                 </td>
                 <td style="text-align:center;white-space:nowrap;">
-                    <a href="?page=services&action=toggle_publish&id=<?= $service['id'] ?>"
-                       style="padding:6px 12px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:500;<?= $service['is_published'] ? 'background:#fef3c7;color:#92400e;' : 'background:#10b981;color:white;' ?>">
-                        <?= $service['is_published'] ? '⏸ 下架' : '▶️ 上架' ?>
+                    <a href="javascript:void(0)" onclick="togglePublish(<?= $s['id'] ?>)"
+                       style="padding:4px 10px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:500;<?= $s['is_published'] ? 'background:#fef3c7;color:#92400e;' : 'background:#10b981;color:white;' ?>">
+                        <?= $s['is_published'] ? '⏸ 下架' : '▶ 上架' ?>
                     </a>
-                    <a href="?page=service_countries&id=<?= $service['id'] ?>"
-                       style="margin-left:4px;padding:6px 12px;background:#e0e7ff;color:#4f46e5;border-radius:6px;text-decoration:none;font-size:12px;font-weight:500;">
+                    <a href="?page=service_countries&service_id=<?= $s['id'] ?>"
+                       style="margin-left:2px;padding:4px 10px;background:#e0e7ff;color:#4f46e5;border-radius:6px;text-decoration:none;font-size:12px;font-weight:500;">
                         🌍 国家
                     </a>
                 </td>
             </tr>
-            <?php endforeach; ?>
-            <?php endif; ?>
+            <?php endforeach; endif; ?>
         </tbody>
     </table>
 </div>
@@ -331,125 +452,111 @@ $msg = $_GET['msg'] ?? '';
 <div style="margin-top:20px;padding:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;">
     <div style="font-weight:600;color:#92400e;margin-bottom:8px;">💡 使用说明</div>
     <ul style="margin:0;padding-left:20px;color:#78350f;font-size:13px;line-height:1.8;">
-        <li>点击「一键同步HeroSMS」获取所有服务、国家和价格数据并保存到本地数据库</li>
-        <li>同步后数据保存在本地，之后API优先从本地读取，不再每次调用HeroSMS</li>
-        <li>勾选服务后可使用「批量上架/下架」功能</li>
-        <li>直接修改行内的中文名、英文名、排序、标签后按回车或点击外部即可保存</li>
-        <li>点击服务行的「上架/下架」按钮控制是否对用户展示</li>
-        <li>点击「国家」按钮可以管理该服务展示的国家</li>
+        <li>「同步 HeroSMS」从上游 API 拉取所有服务/国家/价格数据保存到本地（首次需要运行）</li>
+        <li>服务支持<strong>上架/下架</strong>：下架后客户端不展示，可保留价格数据备用</li>
+        <li><strong>置顶</strong>的服务会优先展示在客户端首页</li>
+        <li>标签<strong>🔥 热门</strong> / <strong>⭐ 推荐</strong>用于客户端做运营标记</li>
+        <li>行内修改「排序/英文名/中文名/置顶/标签」失焦后自动保存</li>
+        <li>点击「🌍 国家」管理该服务在哪些国家可见及其价格系数</li>
     </ul>
 </div>
 
 <script>
-function toggleAllServices(checked) {
-    document.querySelectorAll('.service-checkbox').forEach(cb => cb.checked = checked);
+function toggleAll(checked) {
+    document.querySelectorAll('.row-cb').forEach(cb => cb.checked = checked);
     document.getElementById('selectAll').checked = checked;
     document.getElementById('selectAllHeader').checked = checked;
-    updateSelectedCount();
+    updateCount();
 }
-
-function updateSelectedCount() {
-    const checked = document.querySelectorAll('.service-checkbox:checked');
-    const count = checked.length;
-    const countEl = document.getElementById('selectedCount');
-    const numEl = document.getElementById('selectedNum');
-    if (count > 0) {
-        countEl.style.display = 'inline';
-        numEl.textContent = count;
-    } else {
-        countEl.style.display = 'none';
-    }
+function updateCount() {
+    const checked = document.querySelectorAll('.row-cb:checked');
+    const el = document.getElementById('selectedCount');
+    document.getElementById('selectedNum').textContent = checked.length;
+    el.style.display = checked.length > 0 ? 'inline' : 'none';
 }
-
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.row-cb:checked')).map(cb => cb.value).join(',');
+}
 function batchAction(action) {
-    const checked = document.querySelectorAll('.service-checkbox:checked');
-    if (checked.length === 0) {
-        alert('请先选择要操作的服务');
-        return;
-    }
-    
-    const actionText = action === 'batch_publish' ? '上架' : '下架';
-    if (!confirm('确定要' + actionText + '选中的 ' + checked.length + ' 个服务吗？')) {
-        return;
-    }
-    
-    const ids = Array.from(checked).map(cb => cb.value).join(',');
-    
-    const formData = new FormData();
-    formData.append('action', action);
-    formData.append('ids', ids);
-    
-    const btn = event.target;
-    const originalText = btn.textContent;
-    btn.textContent = '处理中...';
-    btn.disabled = true;
-    
-    fetch('index.php?page=services', {
+    const ids = getSelectedIds();
+    if (!ids) { alert('请先勾选服务'); return; }
+    if (!confirm('确定要执行批量操作吗？')) return;
+    sendAjax({action, ids});
+}
+function setTagToSelected(tag) {
+    const ids = getSelectedIds();
+    if (!ids) { alert('请先勾选服务'); return; }
+    sendAjax({action: 'batch_set_tag', ids, tag});
+}
+function togglePublish(id) {
+    sendAjax({action: 'toggle_publish', id, ids: id});
+}
+function sendAjax(payload) {
+    payload.ajax = 1;
+    return fetch('?page=services', {
         method: 'POST',
-        body: formData,
-        headers: {'X-Requested-With': 'XMLHttpRequest'}
+        body: new URLSearchParams(payload),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
     })
-    .then(r => {
-        if (!r.ok) {
-            return r.text().then(text => { throw new Error('HTTP ' + r.status + ': ' + text.substring(0, 500)); });
-        }
-        return r.json();
-    })
+    .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert('操作成功，已' + actionText + ' ' + data.count + ' 个服务');
-            window.location.reload();
+            location.reload();
         } else {
-            alert('操作失败: ' + (data.error || '未知错误'));
+            alert('操作失败: ' + (data.error || '未知'));
         }
     })
-    .catch((err) => {
-        alert('请求失败: ' + err.message);
-    })
-    .finally(() => {
-        btn.textContent = originalText;
-        btn.disabled = false;
-    });
+    .catch(err => alert('请求失败: ' + err.message));
 }
-
-// 行内编辑：失去焦点时自动保存
-document.querySelectorAll('.inline-edit').forEach(el => {
+function saveServiceField(id, field, value) {
+    const formData = new URLSearchParams();
+    formData.append('ajax', '1');
+    formData.append('action', 'update_service');
+    formData.append('id', id);
+    formData.append(field, value);
+    // 其他字段也带上
+    formData.append('name_cn', document.querySelector(`.field-input[data-id="${id}"][data-field="name_cn"]`)?.value || '');
+    formData.append('name_en', document.querySelector(`.field-input[data-id="${id}"][data-field="name_en"]`)?.value || '');
+    formData.append('sort_order', document.querySelector(`.field-input[data-id="${id}"][data-field="sort_order"]`)?.value || 100);
+    formData.append('is_pinned', document.querySelector(`.field-toggle[data-id="${id}"][data-field="is_pinned"]`)?.checked ? 1 : 0);
+    formData.append('tag', document.querySelector(`.field-input[data-id="${id}"][data-field="tag"]`)?.value || 0);
+    fetch('?page=services', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success) alert('保存失败: ' + (d.error || ''));
+        }).catch(() => {});
+}
+document.querySelectorAll('.field-input').forEach(el => {
+    el.addEventListener('change', function() {
+        saveServiceField(this.dataset.id, this.dataset.field, this.value);
+    });
     el.addEventListener('blur', function() {
         saveServiceField(this.dataset.id, this.dataset.field, this.value);
     });
     el.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.target.blur();
-        }
+        if (e.key === 'Enter') e.target.blur();
     });
 });
-
-// 复选框切换时自动保存
-document.querySelectorAll('.inline-toggle').forEach(el => {
+document.querySelectorAll('.field-toggle').forEach(el => {
     el.addEventListener('change', function() {
         saveServiceField(this.dataset.id, this.dataset.field, this.checked ? 1 : 0);
     });
 });
 
-function saveServiceField(id, field, value) {
-    const formData = new FormData();
-    formData.append('action', 'update_service');
-    formData.append('id', id);
-    formData.append(field, value);
-    formData.append('name_cn', document.querySelector(`.inline-edit[data-id="${id}"][data-field="name_cn"]`)?.value || '');
-    formData.append('name_en', document.querySelector(`.inline-edit[data-id="${id}"][data-field="name_en"]`)?.value || '');
-    formData.append('sort_order', document.querySelector(`.inline-edit[data-id="${id}"][data-field="sort_order"]`)?.value || 0);
-    formData.append('is_pinned', document.querySelector(`.inline-toggle[data-id="${id}"][data-field="is_pinned"]`)?.checked ? 1 : 0);
-    formData.append('tag', document.querySelector(`.inline-edit[data-id="${id}"][data-field="tag"]`)?.value || 0);
-    
-    fetch('', {
-        method: 'POST',
-        body: formData,
-        headers: {'X-Requested-With': 'XMLHttpRequest'}
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            // 静默保存成功，不刷新页面
-        }
-    }).catch(() => {});
+// 搜索/筛选
+let searchTimer = null;
+document.getElementById('searchInput').addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilter, 300);
+});
+function applyFilter() {
+    const q = document.getElementById('searchInput').value.trim();
+    const filter = document.getElementById('filterSelect').value;
+    const tag = document.getElementById('tagSelect').value;
+    const url = new URL(location.href);
+    if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
+    url.searchParams.set('filter', filter);
+    url.searchParams.set('tag', tag);
+    location.href = url.toString();
 }
 </script>

@@ -117,6 +117,8 @@ CREATE TABLE IF NOT EXISTS `services` (
   `is_published` tinyint DEFAULT '0',
   `is_active` tinyint DEFAULT '0',
   `sort_order` int DEFAULT '0',
+  `is_pinned` tinyint DEFAULT '0' COMMENT '是否置顶显示',
+  `tag` tinyint DEFAULT '0' COMMENT '标签: 0=无 1=热门 2=推荐',
   `parent_id` int DEFAULT NULL,
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -124,7 +126,8 @@ CREATE TABLE IF NOT EXISTS `services` (
   UNIQUE KEY `uk_hero_service_id` (`hero_service_id`),
   KEY `idx_active` (`is_active`),
   KEY `idx_published` (`is_published`),
-  KEY `idx_sort_order` (`sort_order`)
+  KEY `idx_sort_order` (`sort_order`),
+  KEY `idx_pinned` (`is_pinned`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
@@ -638,6 +641,19 @@ ALTER TABLE `service_coefficients` ADD COLUMN `service_id` int DEFAULT NULL AFTE
 ALTER TABLE `service_coefficients` ADD COLUMN `coefficient_before` decimal(5,2) DEFAULT NULL AFTER `service_id`;
 ALTER TABLE `service_coefficients` ADD COLUMN `coefficient_after` decimal(5,2) DEFAULT NULL AFTER `coefficient_before`;
 ALTER TABLE `service_coefficients` ADD UNIQUE KEY `uk_service_id` (`service_id`);
+
+-- Migration 2.5: migrations/add_services_pinned_tag.sql
+-- admin 服务管理页需要 is_pinned (置顶) 和 tag (热门/推荐标签) 字段
+ALTER TABLE `services`
+  ADD COLUMN `is_pinned` tinyint DEFAULT '0' COMMENT '是否置顶显示' AFTER `sort_order`,
+  ADD COLUMN `tag` tinyint DEFAULT '0' COMMENT '标签: 0=无 1=热门 2=推荐' AFTER `is_pinned`,
+  ADD KEY `idx_pinned` (`is_pinned`);
+
+-- Migration 2.6: migrations/add_service_countries_custom_price.sql
+-- service_countries 表增加「自定义价格」「系数」字段，admin 后台覆盖上游价格使用
+ALTER TABLE `service_countries`
+  ADD COLUMN `custom_price` decimal(10,4) DEFAULT NULL COMMENT '自定义价格(覆盖 HeroSMS 返回的成本价)' AFTER `price`,
+  ADD COLUMN `coefficient` decimal(5,2) NOT NULL DEFAULT '1.00' COMMENT '价格倍数(在自定义价或上游价基础上乘)' AFTER `custom_price`;
 
 -- Migration 3: migrations/add_performance_indexes.sql
 -- 性能优化索引
