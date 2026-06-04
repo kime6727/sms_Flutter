@@ -731,12 +731,14 @@ if ($path === '/payment/create' && $method === 'POST') {
         $totalCost = floatval($productRow['price'] ?? 0);
         $points = intval($package['points']);
         
+        // payment_orders.id 是 varchar(36) 主键没有 AUTO_INCREMENT，PHP 端生成 UUID
+        $orderId = sprintf('%08x-%04x-%04x-%04x-%012x',
+            mt_rand(0, 0xffffffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff), mt_rand(0, 0xffffffffffff));
         $paymentOrder = $db->query(
-            "INSERT INTO payment_orders (user_id, package_id, amount, points, payment_method, status) VALUES (?, ?, ?, ?, ?, 'pending')",
-            [$userId, $packageId, $totalCost, $points, $paymentMethod]
+            "INSERT INTO payment_orders (id, user_id, package_id, amount, points, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
+            [$orderId, $userId, $packageId, $totalCost, $points, $paymentMethod]
         );
-        
-        $orderId = $db->lastInsertId();
         $db->commit();
         
         logUserActivity($db, $userId, 'create_payment_order', 'payment', $orderId);
