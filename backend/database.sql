@@ -121,7 +121,9 @@ CREATE TABLE IF NOT EXISTS `services` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_hero_service_id` (`hero_service_id`),
   KEY `idx_active` (`is_active`),
+  KEY `idx_published` (`is_published`),
   KEY `idx_sort_order` (`sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -602,12 +604,17 @@ SHOW COLUMNS FROM users;
 -- 执行时间：2026-03-25
 
 -- 添加hero_country_id唯一索引
-ALTER TABLE `countries` 
+ALTER TABLE `countries`
 ADD UNIQUE KEY `uk_hero_country_id` (`hero_country_id`);
 
 -- 为service_countries表添加联合唯一索引
-ALTER TABLE `service_countries` 
+ALTER TABLE `service_countries`
 ADD UNIQUE KEY `uk_service_country` (`service_id`, `country_id`);
+
+-- Migration 2.1: migrations/add_services_unique_index.sql
+-- 为services表添加hero_service_id唯一索引，让 /sync ON DUPLICATE KEY 能去重
+ALTER TABLE `services`
+ADD UNIQUE KEY `uk_hero_service_id` (`hero_service_id`);
 
 -- Migration 3: migrations/add_performance_indexes.sql
 -- 性能优化索引
