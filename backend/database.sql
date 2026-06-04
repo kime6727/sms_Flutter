@@ -687,6 +687,9 @@ CREATE TABLE IF NOT EXISTS `banners` (
 -- 0.0 添加 has_topup_history 字段（首充后打折用，price 计算依赖）
 ALTER TABLE users ADD COLUMN has_topup_history TINYINT DEFAULT 0 COMMENT '是否充值过（首充前/后系数）';
 
+-- 0.0.1 添加 membership_levels.active 字段（/user/profile 端点用到）
+ALTER TABLE membership_levels ADD COLUMN active TINYINT DEFAULT 1 COMMENT '是否启用';
+
 -- 0. 添加 orders 表缺字段（total_price / cost_price / profit，订单业务用到）
 ALTER TABLE orders
   ADD COLUMN total_price decimal(10,2) DEFAULT '0.00' COMMENT '总售价（用户支付）',

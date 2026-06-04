@@ -200,10 +200,13 @@ try {
     ]);
     
 } catch (Exception $e) {
-    logMessage("处理失败: " . $e->getMessage());
-    // 不返回 200，让 HeroSMS 重试
+    logMessage("处理失败: " . $e->getMessage() . " at " . basename($e->getFile()) . ":" . $e->getLine());
+    // 调试阶段：透传 detail 便于排查
     http_response_code(500);
-    echo json_encode(['error' => 'Internal server error']);
+    echo json_encode([
+        'error' => 'Internal server error',
+        'detail' => get_class($e) . ': ' . $e->getMessage() . ' at ' . basename($e->getFile()) . ':' . $e->getLine(),
+    ]);
 }
 
 /**
