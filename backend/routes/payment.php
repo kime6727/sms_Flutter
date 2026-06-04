@@ -99,8 +99,67 @@ if ($path === '/sync' && $method === 'POST') {
         }
 
         if ($type === 'prices' || $type === 'all') {
-            // 同步最新价格（占位实现：调用 getPrices 但仅更新 price 字段）
-            $synced['prices'] = 'scheduled';
+            // 同步所有服务-国家价格关系 (调用 getPrices 不带 service 参数)
+            $pricesResp = $heroSMS->getPrices();
+            if (!empty($pricesResp['success']) && !empty($pricesResp['prices'])) {
+                $prices = $pricesResp['prices'];
+                // API 返回结构: {service_code: {country_id: {cost, count}}}
+                // 或者: {country_id: {service_code: {cost, count}}}
+                $inserted = 0;
+                $updated = 0;
+                $skipped = 0;
+
+                // 检测结构：第一个 key 是数字（country_id）还是字符串（service_code）？
+                $firstKey = array_key_first($prices);
+                $firstVal = $firstKey !== null ? reset($prices) : null;
+
+                if (is_array($firstVal) && is_array($firstVal[$firstKey] ?? null)) {
+                    // 嵌套结构 - 实际是 country_id: {service_code: {cost}}
+                    foreach ($prices as $countryHeroId => $serviceMap) {
+                        if (!is_array($serviceMap)) continue;
+                        foreach ($serviceMap as $serviceCode => $data) {
+                            if (!is_array($data)) continue;
+                            $cost = floatval($data['cost'] ?? 0);
+                            $count = intval($data['count'] ?? 0);
+                            $svcRow = $db->query("SELECT id FROM services WHERE hero_service_id = ? LIMIT 1", [(string)$serviceCode])->fetch();
+                            $ctyRow = $db->query("SELECT id FROM countries WHERE hero_country_id = ? LIMIT 1", [(string)$countryHeroId])->fetch();
+                            if (!$svcRow || !$ctyRow) { $skipped++; continue; }
+                            $exist = $db->query("SELECT id FROM service_countries WHERE service_id = ? AND country_id = ? LIMIT 1", [$svcRow['id'], $ctyRow['id']])->fetch();
+                            if ($exist) {
+                                $db->query("UPDATE service_countries SET price = ?, is_published = 1, is_active = 1, updated_at = NOW() WHERE id = ?", [$cost, $exist['id']]);
+                                $updated++;
+                            } else {
+                                $db->query("INSERT INTO service_countries (service_id, country_id, price, is_published, is_active, created_at, updated_at) VALUES (?, ?, ?, 1, 1, NOW(), NOW())", [$svcRow['id'], $ctyRow['id'], $cost]);
+                                $inserted++;
+                            }
+                        }
+                    }
+                } else {
+                    // 扁平结构: {service_code: {country_id: {cost}}}
+                    foreach ($prices as $serviceCode => $countryMap) {
+                        if (!is_array($countryMap)) continue;
+                        foreach ($countryMap as $countryHeroId => $data) {
+                            if (!is_array($data)) continue;
+                            $cost = floatval($data['cost'] ?? 0);
+                            $svcRow = $db->query("SELECT id FROM services WHERE hero_service_id = ? LIMIT 1", [(string)$serviceCode])->fetch();
+                            $ctyRow = $db->query("SELECT id FROM countries WHERE hero_country_id = ? LIMIT 1", [(string)$countryHeroId])->fetch();
+                            if (!$svcRow || !$ctyRow) { $skipped++; continue; }
+                            $exist = $db->query("SELECT id FROM service_countries WHERE service_id = ? AND country_id = ? LIMIT 1", [$svcRow['id'], $ctyRow['id']])->fetch();
+                            if ($exist) {
+                                $db->query("UPDATE service_countries SET price = ?, is_published = 1, is_active = 1, updated_at = NOW() WHERE id = ?", [$cost, $exist['id']]);
+                                $updated++;
+                            } else {
+                                $db->query("INSERT INTO service_countries (service_id, country_id, price, is_published, is_active, created_at, updated_at) VALUES (?, ?, ?, 1, 1, NOW(), NOW())", [$svcRow['id'], $ctyRow['id'], $cost]);
+                                $inserted++;
+                            }
+                        }
+                    }
+                }
+
+                $synced['prices'] = ['inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped];
+            } else {
+                $synced['prices'] = ['error' => $pricesResp['error'] ?? 'no data'];
+            }
         }
 
         echo json_encode(['success' => true, 'data' => $synced]);
