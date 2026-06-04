@@ -44,21 +44,26 @@ if ($path === '/sync' && $method === 'POST') {
         if ($type === 'services' || $type === 'all') {
             $list = $heroSMS->getServicesList();
             if (!empty($list['services'])) {
-                foreach ($list['services'] as $code => $info) {
-                    // 注意：services 表无 `active` 字段，使用 is_active 和 is_published
-                    // 同时 hero_service_id 才是主键去重依据
+                $synced['services'] = 0;
+                foreach ($list['services'] as $info) {
+                    // HeroSMS 返回结构是数组: [{code, name, ...}, ...]
+                    // code 才是真正的服务编码，hero_service_id 同步为 code
+                    if (!is_array($info) || empty($info['code'])) continue;
+                    $code = (string)$info['code'];
+                    $name = $info['name'] ?? $code;
                     $db->query(
-                        "INSERT INTO services (hero_service_id, code, name, name_en, icon, is_active, is_published, sort_order, created_at, updated_at)
-                         VALUES (?, ?, ?, ?, ?, 1, 1, 0, NOW(), NOW())
+                        "INSERT INTO services (hero_service_id, code, name, name_en, is_active, is_published, sort_order, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, 1, 1, 0, NOW(), NOW())
                          ON DUPLICATE KEY UPDATE
                            name = VALUES(name),
                            name_en = VALUES(name_en),
                            is_active = 1,
+                           is_published = 1,
                            updated_at = NOW()",
-                        [$code, $code, $info['name'] ?? $code, $info['name'] ?? $code, $info['icon'] ?? null]
+                        [$code, $code, $name, $name]
                     );
+                    $synced['services']++;
                 }
-                $synced['services'] = count($list['services']);
             }
         }
 
