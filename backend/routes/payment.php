@@ -66,11 +66,17 @@ if ($path === '/sync' && $method === 'POST') {
             $list = $heroSMS->getCountries();
             if (!empty($list['countries'])) {
                 foreach ($list['countries'] as $id => $info) {
+                    // hero_country_id 才是去重依据（uk_hero_country_id 唯一键）
+                    // id 是自增主键，不要手动指定
                     $db->query(
-                        "INSERT INTO countries (id, name, code, active, sort_order, created_at, updated_at)
+                        "INSERT INTO countries (hero_country_id, name, code, active, sort_order, created_at, updated_at)
                          VALUES (?, ?, ?, 1, 0, NOW(), NOW())
-                         ON DUPLICATE KEY UPDATE name=VALUES(name), updated_at=NOW()",
-                        [intval($id), $info['name'] ?? '', strtolower($info['code'] ?? '')]
+                         ON DUPLICATE KEY UPDATE
+                           name = VALUES(name),
+                           code = VALUES(code),
+                           active = 1,
+                           updated_at = NOW()",
+                        [(string)$id, $info['name'] ?? '', strtolower($info['code'] ?? '')]
                     );
                 }
                 $synced['countries'] = count($list['countries']);
