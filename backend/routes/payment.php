@@ -161,10 +161,17 @@ if ($path === '/verify-receipt' && $method === 'POST') {
             [$points, $userId]
         );
         
-        $db->query(
-            "INSERT INTO credit_transactions (user_id, type, amount, balance_after, description) VALUES (?, 'topup', ?, (SELECT balance FROM users WHERE id = ?), ?)",
-            [$userId, $points, $userId, "Apple IAP充值 - 交易号: " . ($transactionId ?? 'N/A') . ($isFirstTopup ? ' (首充双倍)' : '')]
-        );
+        // 使用 insert() 让 Database 帮手自动生成 UUID（表主键是 varchar(36) 无 AUTO_INCREMENT）
+        $balanceBeforeTopup = $user['balance'];
+        $balanceAfterTopup = $balanceBeforeTopup + $points;
+        $db->insert('credit_transactions', [
+            'user_id' => $userId,
+            'type' => 'topup',
+            'amount' => $points,
+            'balance_before' => $balanceBeforeTopup,
+            'balance_after' => $balanceAfterTopup,
+            'description' => "Apple IAP充值 - 交易号: " . ($transactionId ?? 'N/A') . ($isFirstTopup ? ' (首充双倍)' : ''),
+        ]);
         
         // 记录交易到 apple_transactions 表
         $purchaseDateSql = $purchaseDate ? "'" . date('Y-m-d H:i:s', strtotime($purchaseDate)) . "'" : 'NOW()';
@@ -268,11 +275,17 @@ if ($path === '/orders/batch' && $method === 'POST') {
             "UPDATE users SET balance = balance - ? WHERE id = ?",
             [$totalCost, $userId]
         );
-        
-        $db->query(
-            "INSERT INTO credit_transactions (user_id, type, amount, balance_after, description) VALUES (?, 'order', -?, (SELECT balance FROM users WHERE id = ?), ?)",
-            [$userId, $totalCost, $userId, "批量订单"]
-        );
+
+        // 使用 insert() 自动生成 UUID 主键（避免手写 SQL 缺 id 失败）
+        $balanceBeforeBatch = $user['balance'] - $totalCost;
+        $db->insert('credit_transactions', [
+            'user_id' => $userId,
+            'type' => 'order',
+            'amount' => -$totalCost,
+            'balance_before' => $balanceBeforeBatch + $totalCost,
+            'balance_after' => $balanceBeforeBatch,
+            'description' => "批量订单",
+        ]);
         
         $db->commit();
         
@@ -687,7 +700,9 @@ if ($path === '/auth/account-info' && $method === 'GET') {
     }
     
     $user = $db->query(
-        "SELECT id, username, email, has_password FROM users WHERE id = ?",
+        "SELECT id, username, email,
+                (password_hash IS NOT NULL AND password_hash != '') AS has_password
+         FROM users WHERE id = ?",
         [$userId]
     )->fetch();
     
@@ -807,11 +822,18 @@ if ($path === '/payment/verify-apple' && $method === 'POST') {
             "UPDATE users SET balance = balance + ?, has_topup_history = 1 WHERE id = ?",
             [$order['points'], $userId]
         );
-        
-        $db->query(
-            "INSERT INTO credit_transactions (user_id, type, amount, balance_after, description) VALUES (?, 'topup', ?, (SELECT balance FROM users WHERE id = ?), ?)",
-            [$userId, $order['points'], $userId, "充值订单 #$orderId"]
-        );
+
+        // 使用 insert() 自动生成 UUID 主键
+        $balanceBeforeManual = $db->query("SELECT balance FROM users WHERE id = ?", [$userId])->fetchColumn();
+        $balanceAfterManual = $balanceBeforeManual;
+        $db->insert('credit_transactions', [
+            'user_id' => $userId,
+            'type' => 'topup',
+            'amount' => $order['points'],
+            'balance_before' => $balanceAfterManual - $order['points'],
+            'balance_after' => $balanceAfterManual,
+            'description' => "充值订单 #$orderId",
+        ]);
         
         $db->commit();
         
@@ -987,7 +1009,15 @@ if ($path === '/payment/packages' && $method === 'GET') {
 
 // 获取充值套餐（/topup-packages 别名）
 if ($path === '/topup-packages' && $method === 'GET') {
-    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price as price, description active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price, description, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+
+    // active 字段转布尔，便于前端判断
+    $packages = array_map(function($pkg) {
+        $pkg['is_recommended'] = false;
+        $pkg['active'] = intval($pkg['active']) === 1;
+        return $pkg;
+    }, $packages);
+
     echo json_encode(['success' => true, 'data' => $packages]);
     exit;
 }

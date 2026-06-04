@@ -41,12 +41,19 @@ if ($path === '/topup' && $method === 'POST') {
         $totalCost = floatval($package['price']);
         $points = intval($package['points']);
         
-        $topupOrder = $db->query(
-            "INSERT INTO topup_orders (user_id, package_id, amount, points, payment_method, apple_product_id, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')",
-            [$userId, $packageId, $totalCost, $points, $paymentMethod, $appleProductId]
-        );
-        
-        $orderId = $db->lastInsertId();
+        // 使用 insert() 自动生成 UUID（topup_orders.id 是 varchar(36) 主键，无 AUTO_INCREMENT）
+        $topupOrder = $db->insert('topup_orders', [
+            'user_id' => $userId,
+            'package_id' => $packageId,
+            'package_source' => 'topup_packages',
+            'apple_product_id' => $appleProductId,
+            'amount' => $totalCost,
+            'points' => $points,
+            'payment_method' => $paymentMethod,
+            'status' => 'pending',
+        ]);
+
+        $orderId = $topupOrder;
         
         $db->commit();
         
@@ -108,11 +115,17 @@ if ($path === '/topup/verify-apple' && $method === 'POST') {
             "UPDATE users SET balance = balance + ?, has_topup_history = 1 WHERE id = ?",
             [$order['points'], $userId]
         );
-        
-        $db->query(
-            "INSERT INTO credit_transactions (user_id, type, amount, balance_after, description) VALUES (?, 'topup', ?, (SELECT balance FROM users WHERE id = ?), ?)",
-            [$userId, $order['points'], $userId, "充值订单 #$orderId"]
-        );
+
+        // 使用 insert() 自动生成 UUID 主键（credit_transactions.id 是 varchar(36) 无 AUTO_INCREMENT）
+        $balanceAfterTopup = $db->query("SELECT balance FROM users WHERE id = ?", [$userId])->fetchColumn();
+        $db->insert('credit_transactions', [
+            'user_id' => $userId,
+            'type' => 'topup',
+            'amount' => $order['points'],
+            'balance_before' => $balanceAfterTopup - $order['points'],
+            'balance_after' => $balanceAfterTopup,
+            'description' => "充值订单 #$orderId",
+        ]);
         
         $db->commit();
         

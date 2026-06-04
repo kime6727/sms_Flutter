@@ -129,7 +129,10 @@ class PaymentProvider extends ChangeNotifier {
           await prefs.setInt('balance', newBalance);
         }
 
-        if (response['first_topup_bonus'] == true) {
+        // 后端 /verify-receipt 实际返回 is_first_topup 字段（兼容旧 first_topup_bonus）
+        final isFirstTopup = response['is_first_topup'] == true ||
+            response['first_topup_bonus'] == true;
+        if (isFirstTopup) {
           _isFirstTopup = false;
           await SharedPreferences.getInstance().then((prefs) async {
             await prefs.setBool('has_topup_history', true);
