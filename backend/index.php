@@ -325,22 +325,6 @@ try {
         exit;
     }
 
-    // ====================
-    // 临时调试端点 - 看 HeroSMS 真实响应 (生产可移除)
-    // ====================
-    if ($path === '/debug/hero-api' && $method === 'GET') {
-        header('Content-Type: application/json; charset=utf-8');
-        $result = [];
-        try {
-            $result['countries'] = $heroSMS->getCountries();
-            $result['services'] = $heroSMS->getServicesList();
-        } catch (Exception $e) {
-            $result['error'] = $e->getMessage();
-        }
-        echo json_encode($result, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-        exit;
-    }
-
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
 

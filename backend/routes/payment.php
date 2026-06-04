@@ -76,6 +76,11 @@ if ($path === '/sync' && $method === 'POST') {
 
                     // hero_country_id 才是去重依据（uk_hero_country_id 唯一键）
                     // id 是自增主键，不要手动指定
+                    // code 字段只保留前 10 字符（避免超长英文名截断）
+                    $code = strtolower($engName);
+                    if (strlen($code) > 10) {
+                        $code = substr($code, 0, 10);
+                    }
                     $db->query(
                         "INSERT INTO countries (hero_country_id, name, name_en, name_cn, code, active, sort_order, created_at, updated_at)
                          VALUES (?, ?, ?, ?, ?, 1, 0, NOW(), NOW())
@@ -86,7 +91,7 @@ if ($path === '/sync' && $method === 'POST') {
                            code = VALUES(code),
                            active = 1,
                            updated_at = NOW()",
-                        [(string)$heroCountryId, $displayName, $engName, $chnName, strtolower($engName)]
+                        [(string)$heroCountryId, $displayName, $engName, $chnName, $code]
                     );
                 }
                 $synced['countries'] = count($list['countries']);
