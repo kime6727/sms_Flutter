@@ -352,6 +352,22 @@ try {
         exit;
     }
 
+    // 临时调试 - 看 getServicesList 真实结构
+    if ($path === '/debug/services-list' && $method === 'GET') {
+        header('Content-Type: application/json; charset=utf-8');
+        $r = $heroSMS->getServicesList();
+        $sample = [];
+        $i = 0;
+        if (!empty($r['services'])) {
+            foreach ($r['services'] as $k1 => $v1) {
+                if ($i++ >= 3) break;
+                $sample[$k1] = $v1;
+            }
+        }
+        echo json_encode(['success' => true, 'sample' => $sample, 'raw' => substr(json_encode($r, JSON_UNESCAPED_UNICODE), 0, 1500)], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
 
