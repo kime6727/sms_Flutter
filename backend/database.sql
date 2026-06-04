@@ -134,7 +134,9 @@ CREATE TABLE IF NOT EXISTS `service_countries` (
   `id` int NOT NULL AUTO_INCREMENT,
   `service_id` int NOT NULL,
   `country_id` int NOT NULL,
-  `price` decimal(10,2) DEFAULT '0.00',
+  `price` decimal(10,4) DEFAULT '0.0000' COMMENT 'HeroSMS 返回的成本价(美元)',
+  `stock` int NOT NULL DEFAULT '0' COMMENT '库存数量',
+  `cost_points` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '用户需支付积分(根据 price × 汇率计算)',
   `is_published` tinyint DEFAULT '0',
   `is_active` tinyint DEFAULT '0',
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -143,7 +145,6 @@ CREATE TABLE IF NOT EXISTS `service_countries` (
   UNIQUE KEY `uk_service_country` (`service_id`,`country_id`),
   KEY `idx_service_id` (`service_id`),
   KEY `idx_country_id` (`country_id`),
-  KEY `idx_sc_service_country` (`service_id`, `country_id`),
   KEY `idx_published_active` (`is_published`, `is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -620,6 +621,13 @@ ADD UNIQUE KEY `uk_hero_service_id` (`hero_service_id`);
 -- 为topup_packages表添加price字段，Flutter model需要
 ALTER TABLE `topup_packages`
 ADD COLUMN `price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '显示价格(参考用，实际以App Store为准)' AFTER `points`;
+
+-- Migration 2.3: migrations/enhance_service_countries.sql
+-- 增强 service_countries：加 stock 库存、cost_points 积分价、改 price 精度为 4 位
+ALTER TABLE `service_countries`
+  MODIFY COLUMN `price` decimal(10,4) DEFAULT '0.0000' COMMENT 'HeroSMS 返回的成本价(美元)',
+  ADD COLUMN `stock` int NOT NULL DEFAULT '0' COMMENT '库存数量' AFTER `price`,
+  ADD COLUMN `cost_points` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '用户需支付积分(根据 price × 汇率计算)' AFTER `stock`;
 
 -- Migration 3: migrations/add_performance_indexes.sql
 -- 性能优化索引
