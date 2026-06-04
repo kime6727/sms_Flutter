@@ -325,6 +325,33 @@ try {
         exit;
     }
 
+    // 临时调试
+    if ($path === '/debug/prices' && $method === 'GET') {
+        header('Content-Type: application/json; charset=utf-8');
+        $r = $heroSMS->getPrices();
+        // 抽取前 3 个样本
+        $sample = [];
+        $i = 0;
+        if (!empty($r['prices'])) {
+            foreach ($r['prices'] as $k1 => $v1) {
+                if ($i++ >= 3) break;
+                if (is_array($v1)) {
+                    $inner = [];
+                    $j = 0;
+                    foreach ($v1 as $k2 => $v2) {
+                        if ($j++ >= 3) break;
+                        $inner[$k2] = $v2;
+                    }
+                    $sample[$k1] = $inner;
+                } else {
+                    $sample[$k1] = $v1;
+                }
+            }
+        }
+        echo json_encode(['success' => true, 'sample' => $sample, 'top_keys' => is_array($r['prices'] ?? null) ? array_slice(array_keys($r['prices']), 0, 5) : []], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     // 如果没有匹配的路由，返回404
     apiNotFound('接口不存在');
 
