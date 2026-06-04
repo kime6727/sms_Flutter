@@ -931,11 +931,14 @@ if ($path === '/auth/manual-register' && $method === 'POST') {
     
     // 如果是新设备，记录积分奖励交易
     if ($isNewDevice && $deviceId && $bonusAmount > 0) {
-        $txId = 'txn_' . bin2hex(random_bytes(8));
-        $db->query(
-            "INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description, created_at) VALUES (?, ?, 'bonus', ?, ?, '新用户注册奖励', NOW())",
-            [$txId, $userId, $bonusAmount, $bonusAmount]
-        );
+        $db->insert('credit_transactions', [
+            'user_id' => $userId,
+            'type' => 'bonus',
+            'amount' => $bonusAmount,
+            'balance_before' => 0,
+            'balance_after' => $bonusAmount,
+            'description' => '新用户注册奖励',
+        ]);
     }
     
     logUserActivity($db, $userId, 'manual_register', 'auth', $userId);

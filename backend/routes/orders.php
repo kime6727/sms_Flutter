@@ -125,15 +125,21 @@ if ($path === '/orders' && $method === 'POST') {
             mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
         );
         
-        $db->query(
-            "INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description) VALUES (?, ?, 'order', ?, ?, ?)",
-            [$txnId, $userId, -$totalCost, $balanceAfter, "订单 #$orderId"]
-        );
-        
+        // 使用 insert() 自动生成 UUID 主键 + 补充 balance_before
+        $db->insert('credit_transactions', [
+            'id' => $txnId,
+            'user_id' => $userId,
+            'type' => 'order',
+            'amount' => -$totalCost,
+            'balance_before' => $balanceAfter + $totalCost,
+            'balance_after' => $balanceAfter,
+            'description' => "订单 #$orderId",
+        ]);
+
         $db->commit();
-        
+
         logUserActivity($db, $userId, 'create_order', 'order', $orderId);
-        
+
         echo json_encode([
             'success' => true,
             'data' => [
@@ -201,12 +207,17 @@ if (preg_match('/^\/orders\/(.+)\/activate$/', $path, $matches) && $method === '
         );
         
         $refundBalanceAfter = $db->query("SELECT balance FROM users WHERE id = ?", [$order['user_id']])->fetchColumn();
-        
-        $db->query(
-            "INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description) VALUES (?, ?, 'refund', ?, ?, ?)",
-            [$refundTxnId, $order['user_id'], $refundAmount, $refundBalanceAfter, "订单 #$orderId 激活失败退款"]
-        );
-        
+
+        $db->insert('credit_transactions', [
+            'id' => $refundTxnId,
+            'user_id' => $order['user_id'],
+            'type' => 'refund',
+            'amount' => $refundAmount,
+            'balance_before' => $refundBalanceAfter - $refundAmount,
+            'balance_after' => $refundBalanceAfter,
+            'description' => "订单 #$orderId 激活失败退款",
+        ]);
+
         apiError('激活失败: ' . $result['message'], 400, 'activation_failed', [
             'order_id' => $orderId,
             'refunded' => true
@@ -310,11 +321,16 @@ if (preg_match('/^\/orders\/(.+)\/cancel$/', $path, $matches) && $method === 'PO
         );
         
         $cancelBalanceAfter = $db->query("SELECT balance FROM users WHERE id = ?", [$order['user_id']])->fetchColumn();
-        
-        $db->query(
-            "INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description) VALUES (?, ?, 'refund', ?, ?, ?)",
-            [$cancelTxnId, $order['user_id'], $cancelRefundAmount, $cancelBalanceAfter, "订单 #$orderId 取消退款"]
-        );
+
+        $db->insert('credit_transactions', [
+            'id' => $cancelTxnId,
+            'user_id' => $order['user_id'],
+            'type' => 'refund',
+            'amount' => $cancelRefundAmount,
+            'balance_before' => $cancelBalanceAfter - $cancelRefundAmount,
+            'balance_after' => $cancelBalanceAfter,
+            'description' => "订单 #$orderId 取消退款",
+        ]);
         
         $db->commit();
         
@@ -426,15 +442,20 @@ if ($path === '/orders/create' && $method === 'POST') {
             mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
         );
         
-        $db->query(
-            "INSERT INTO credit_transactions (id, user_id, type, amount, balance_after, description) VALUES (?, ?, 'order', ?, ?, ?)",
-            [$createTxnId, $userId, -$totalCost, $createBalanceAfter, "订单 #$orderId"]
-        );
-        
+        $db->insert('credit_transactions', [
+            'id' => $createTxnId,
+            'user_id' => $userId,
+            'type' => 'order',
+            'amount' => -$totalCost,
+            'balance_before' => $createBalanceAfter + $totalCost,
+            'balance_after' => $createBalanceAfter,
+            'description' => "订单 #$orderId",
+        ]);
+
         $db->commit();
-        
+
         logUserActivity($db, $userId, 'create_order', 'order', $orderId);
-        
+
         echo json_encode([
             'success' => true,
             'data' => [
