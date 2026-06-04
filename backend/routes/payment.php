@@ -706,31 +706,29 @@ if ($path === '/auth/account-info' && $method === 'GET') {
 // 创建支付订单
 if ($path === '/payment/create' && $method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
-    $userId = $input['user_id'] ?? null;
+    $userId = getCurrentUserIdFromToken(); // 安全修复：只从 token 取
     $packageId = $input['package_id'] ?? null;
     $paymentMethod = $input['payment_method'] ?? 'apple_iap';
-    
-    if (!$userId) {
-        $userId = getCurrentUserIdFromToken();
-    }
-    
+
     if (!$userId || !$packageId) {
         apiBadRequest('参数缺失');
     }
-    
+
     $db->beginTransaction();
     try {
         $user = $db->query("SELECT balance FROM users WHERE id = ?", [$userId])->fetch();
         if (!$user) {
             apiNotFound('用户不存在');
         }
-        
+
         $package = $db->query("SELECT * FROM topup_packages WHERE id = ? AND is_active = 1", [$packageId])->fetch();
         if (!$package) {
             apiNotFound('套餐不存在');
         }
-        
-        $totalCost = floatval($package['price']);
+
+        // topup_packages 表没有 price 列，按 product_id 在 payment_configs 里反查价格
+        $productRow = $db->query("SELECT price FROM payment_configs WHERE product_id = ?", [$package['product_id']])->fetch();
+        $totalCost = floatval($productRow['price'] ?? 0);
         $points = intval($package['points']);
         
         $paymentOrder = $db->query(
