@@ -154,7 +154,9 @@ if ($path === '/orders' && $method === 'POST') {
         ]);
     } catch (Exception $e) {
         $db->rollBack();
-        apiServerError('创建订单失败');
+        apiError('创建订单失败', 500, 'server_error', [
+            'detail' => get_class($e) . ': ' . $e->getMessage() . ' at ' . basename($e->getFile()) . ':' . $e->getLine()
+        ]);
     }
     exit;
 }
