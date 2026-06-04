@@ -54,8 +54,13 @@ CREATE TABLE IF NOT EXISTS `admins` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 插入默认管理员账号 (密码: admin123)
+-- 用两步：先 INSERT IGNORE 插入，再 UPDATE 强制刷新密码
+-- 这样无论数据库有没有这条 admin 记录，最终密码都是正确的
 INSERT IGNORE INTO `admins` (`id`, `username`, `password`, `email`, `role`, `status`) VALUES
-('admin_001', 'admin', '$2y$10$./afSj92jcsZMOvo4m.H/uUfW.sCrOyaIG5wNm4E60jvsIS7mp3ja', 'admin@example.com', 'admin', 'active');
+('admin_001', 'admin', '$2y$10$2h0WZ8UA7Bq/k0Nj9JjuEOv3WqJvC2BilsFvpeUdGixYOEy26o9je', 'admin@example.com', 'admin', 'active');
+
+-- 强制刷新 admin 密码（hash 之前拼错了，必须用 UPDATE 覆盖）
+UPDATE `admins` SET `password` = '$2y$10$2h0WZ8UA7Bq/k0Nj9JjuEOv3WqJvC2BilsFvpeUdGixYOEy26o9je' WHERE `username` = 'admin';
 
 -- ============================================
 -- 2. 管理员操作日志表
