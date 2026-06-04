@@ -617,7 +617,7 @@ if ($path === '/services/price/calculated' && $method === 'GET') {
          FROM service_countries sc
          LEFT JOIN services s ON sc.service_id = s.id
          LEFT JOIN countries c ON sc.country_id = c.id
-         WHERE sc.service_id = ? AND sc.country_id = ? AND sc.is_published = 1 AND sc.active = 1",
+         WHERE sc.service_id = ? AND sc.country_id = ? AND sc.is_published = 1 AND sc.is_active = 1",
         [$serviceId, $countryId]
     )->fetch();
     
@@ -672,7 +672,7 @@ if ($path === '/recommend/numbers' && $method === 'GET') {
     // 用库存 + 价格做"推荐"（库存充足的号码默认推荐）
     $stock = $heroSMS->checkStock($serviceId, intval($countryId));
     $price = $db->query(
-        "SELECT price FROM service_countries WHERE service_id = ? AND country_id = ? AND active = 1",
+        "SELECT price FROM service_countries WHERE service_id = ? AND country_id = ? AND is_published = 1 AND is_active = 1",
         [$serviceId, $countryId]
     )->fetchColumn();
 

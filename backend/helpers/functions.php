@@ -67,7 +67,7 @@ function calculateServicePricePoints($db, $serviceId, $countryId, $userId = null
     $serviceCountry = $db->query(
         "SELECT sc.price
          FROM service_countries sc
-         WHERE sc.service_id = ? AND sc.country_id = ? AND sc.is_published = 1 AND sc.active = 1",
+         WHERE sc.service_id = ? AND sc.country_id = ? AND sc.is_published = 1 AND sc.is_active = 1",
         [$serviceId, $countryId]
     )->fetch();
     
