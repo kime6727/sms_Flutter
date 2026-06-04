@@ -616,6 +616,11 @@ ADD UNIQUE KEY `uk_service_country` (`service_id`, `country_id`);
 ALTER TABLE `services`
 ADD UNIQUE KEY `uk_hero_service_id` (`hero_service_id`);
 
+-- Migration 2.2: migrations/add_topup_packages_price.sql
+-- 为topup_packages表添加price字段，Flutter model需要
+ALTER TABLE `topup_packages`
+ADD COLUMN `price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '显示价格(参考用，实际以App Store为准)' AFTER `points`;
+
 -- Migration 3: migrations/add_performance_indexes.sql
 -- 性能优化索引
 -- 执行时间: 2026-05-11
@@ -804,6 +809,7 @@ CREATE TABLE IF NOT EXISTS `topup_packages` (
   `name_cn` varchar(100) DEFAULT NULL COMMENT '套餐名称(中文)',
   `description` text COMMENT '套餐描述',
   `points` int(11) NOT NULL COMMENT '获得积分数量',
+  `price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT '显示价格(参考用，实际以App Store为准)',
   `product_id` varchar(100) NOT NULL COMMENT 'Apple IAP 消耗型产品ID',
   `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
   `is_recommended` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否推荐',

@@ -1039,12 +1039,15 @@ if ($path === '/payment/packages' && $method === 'GET') {
 
 // 获取充值套餐（/topup-packages 别名）
 if ($path === '/topup-packages' && $method === 'GET') {
-    $packages = $db->query("SELECT id, product_id, config_name as name, credits as points, price, description, active FROM payment_configs WHERE active = 1 ORDER BY credits ASC")->fetchAll();
+    // topup_packages 表字段：id, name, name_en, name_cn, description, points, price, product_id, is_active, is_recommended, sort_order
+    $packages = $db->query("SELECT id, name, name_en, name_cn, description, points, price, product_id, is_active, is_recommended, sort_order FROM topup_packages WHERE is_active = 1 ORDER BY sort_order ASC, points ASC")->fetchAll();
 
-    // active 字段转布尔，便于前端判断
+    // 字段类型标准化
     $packages = array_map(function($pkg) {
-        $pkg['is_recommended'] = false;
-        $pkg['active'] = intval($pkg['active']) === 1;
+        $pkg['points'] = intval($pkg['points']);
+        $pkg['price'] = floatval($pkg['price']);
+        $pkg['is_recommended'] = intval($pkg['is_recommended']) === 1;
+        $pkg['is_active'] = intval($pkg['is_active']) === 1;
         return $pkg;
     }, $packages);
 

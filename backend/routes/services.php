@@ -39,13 +39,13 @@ if ($path === '/service-countries' && $method === 'GET') {
     $countryId = $_GET['country_id'] ?? null;
     $userId = $_GET['user_id'] ?? null;
     
-    $sql = "SELECT sc.id, sc.service_id, sc.country_id, sc.price, sc.is_published, sc.is_auto, sc.active,
+    $sql = "SELECT sc.id, sc.service_id, sc.country_id, sc.price, sc.is_published, sc.is_active,
                    s.name as service_name, s.name_en as service_name_en, s.name_cn as service_name_cn, s.icon as service_icon,
                    c.name as country_name, c.name_en as country_name_en, c.name_cn as country_name_cn, c.code as country_code, c.flag as country_flag, c.phone_code
             FROM service_countries sc
             LEFT JOIN services s ON sc.service_id = s.id
             LEFT JOIN countries c ON sc.country_id = c.id
-            WHERE sc.is_published = 1 AND sc.active = 1";
+            WHERE sc.is_published = 1 AND sc.is_active = 1";
     
     $params = [];
     if ($serviceId) {
@@ -81,13 +81,13 @@ if ($path === '/service-countries/published' && $method === 'GET') {
     $countryId = $_GET['country_id'] ?? null;
     $userId = $_GET['user_id'] ?? null;
     
-    $sql = "SELECT sc.id, sc.service_id, sc.country_id, sc.price, sc.is_published, sc.is_auto, sc.active,
+    $sql = "SELECT sc.id, sc.service_id, sc.country_id, sc.price, sc.is_published, sc.is_active,
                    s.name as service_name, s.name_en as service_name_en, s.name_cn as service_name_cn, s.icon as service_icon,
                    c.name as country_name, c.name_en as country_name_en, c.name_cn as country_name_cn, c.code as country_code, c.flag as country_flag, c.phone_code
             FROM service_countries sc
             LEFT JOIN services s ON sc.service_id = s.id
             LEFT JOIN countries c ON sc.country_id = c.id
-            WHERE sc.is_published = 1 AND sc.active = 1";
+            WHERE sc.is_published = 1 AND sc.is_active = 1";
     
     $params = [];
     if ($serviceId) {
