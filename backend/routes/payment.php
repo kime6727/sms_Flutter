@@ -45,6 +45,9 @@ if ($path === '/sync' && $method === 'POST') {
             $list = $heroSMS->getServicesList();
             if (!empty($list['services'])) {
                 $synced['services'] = 0;
+                // 先清空旧数据（数据格式已从 keyed map 改为 array of {code, name}）
+                $db->query("DELETE FROM service_countries WHERE 1");
+                $db->query("DELETE FROM services WHERE 1");
                 foreach ($list['services'] as $info) {
                     // HeroSMS 返回结构是数组: [{code, name, ...}, ...]
                     // code 才是真正的服务编码，hero_service_id 同步为 code
