@@ -19,10 +19,12 @@ class OrderModel {
   final String? serviceName;
   final String? serviceNameEn;
   final String? serviceIcon;
+  final String? serviceCode;
   final String? countryName;
   final String? countryNameEn;
   final String? countryCode;
   final String? countryFlag;
+  final String? heroCountryId;
 
   OrderModel({
     required this.id,
@@ -37,15 +39,17 @@ class OrderModel {
     this.expiresAt,
     this.activatedAt,
     this.completedAt,
-    required this.createdAt,
-    required this.updatedAt,
+    this.createdAt = '',
+    this.updatedAt = '',
     this.serviceName,
     this.serviceNameEn,
     this.serviceIcon,
+    this.serviceCode,
     this.countryName,
     this.countryNameEn,
     this.countryCode,
     this.countryFlag,
+    this.heroCountryId,
   });
 
   /// 不可变更新：仅修改传入的非空字段，避免 30+ 行的手动重建
@@ -67,10 +71,12 @@ class OrderModel {
     String? serviceName,
     String? serviceNameEn,
     String? serviceIcon,
+    String? serviceCode,
     String? countryName,
     String? countryNameEn,
     String? countryCode,
     String? countryFlag,
+    String? heroCountryId,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -90,10 +96,12 @@ class OrderModel {
       serviceName: serviceName ?? this.serviceName,
       serviceNameEn: serviceNameEn ?? this.serviceNameEn,
       serviceIcon: serviceIcon ?? this.serviceIcon,
+      serviceCode: serviceCode ?? this.serviceCode,
       countryName: countryName ?? this.countryName,
       countryNameEn: countryNameEn ?? this.countryNameEn,
       countryCode: countryCode ?? this.countryCode,
       countryFlag: countryFlag ?? this.countryFlag,
+      heroCountryId: heroCountryId ?? this.heroCountryId,
     );
   }
 
@@ -134,10 +142,12 @@ class OrderModel {
       serviceName: json['service_name']?.toString(),
       serviceNameEn: json['service_name_en']?.toString(),
       serviceIcon: json['service_icon']?.toString(),
+      serviceCode: json['service_code']?.toString(),
       countryName: json['country_name']?.toString(),
       countryNameEn: json['country_name_en']?.toString(),
       countryCode: json['country_code']?.toString(),
       countryFlag: json['country_flag']?.toString(),
+      heroCountryId: json['hero_country_id']?.toString(),
     );
   }
 
@@ -160,10 +170,12 @@ class OrderModel {
       'service_name': serviceName,
       'service_name_en': serviceNameEn,
       'service_icon': serviceIcon,
+      'service_code': serviceCode,
       'country_name': countryName,
       'country_name_en': countryNameEn,
       'country_code': countryCode,
       'country_flag': countryFlag,
+      'hero_country_id': heroCountryId,
     };
   }
 

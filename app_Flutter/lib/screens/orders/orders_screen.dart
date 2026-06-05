@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/order_provider.dart';
 import '../../models/order_model.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/cms_image.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -312,19 +313,18 @@ class _OrderCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
+                  CmsImage(
+                    kind: 'country',
+                    heroId: order.heroCountryId,
+                    fallbackText: (order.countryCode ?? order.countryDisplayName).isEmpty
+                        ? '?'
+                        : ((order.countryCode?.isNotEmpty == true)
+                            ? order.countryCode!.toUpperCase()
+                            : order.countryDisplayName.characters.first.toUpperCase()),
                     width: 48,
                     height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        order.countryFlag ?? '',
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    fit: BoxFit.cover,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
