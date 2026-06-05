@@ -3,6 +3,24 @@
  * 订单相关路由
  */
 
+require_once __DIR__ . '/../lib/SchemaManager.php';
+
+// Schema 自愈: 补齐 orders 批量订单字段
+// 尝试从多种作用域获取 $db（兼容不同调用方式）
+$_schema_db = null;
+if (isset($db) && $db instanceof Database) {
+    $_schema_db = $db;
+} elseif (isset($GLOBALS['db']) && $GLOBALS['db'] instanceof Database) {
+    $_schema_db = $GLOBALS['db'];
+}
+if ($_schema_db) {
+    SchemaManager::ensureColumn($_schema_db, 'orders', 'batch_id', 'VARCHAR(36) DEFAULT NULL COMMENT \'批量订单组 ID\'', 'quantity');
+    SchemaManager::ensureColumn($_schema_db, 'orders', 'purchase_expires_at', 'DATETIME DEFAULT NULL COMMENT \'购买后过期时间(3天)\'', 'created_at');
+    SchemaManager::ensureIndex($_schema_db, 'orders', 'idx_batch_id', 'batch_id');
+    SchemaManager::ensureIndex($_schema_db, 'orders', 'idx_purchase_expires', 'purchase_expires_at');
+}
+unset($_schema_db);
+
 // 获取订单列表
 if (preg_match('/^\/orders$/', $path) && $method === 'GET') {
     $userId = getSecureUserId();
@@ -83,72 +101,76 @@ if ($path === '/orders' && $method === 'POST') {
         $pricePoints = calculateServicePricePoints($db, $serviceId, $countryId, $userId);
 
         $totalCost = $pricePoints * $quantity;
-        
+
         // 获取真实美元成本价
         $usdPrice = $db->query(
             "SELECT price FROM service_countries WHERE service_id = ? AND country_id = ? AND is_published = 1 AND is_active = 1 LIMIT 1",
             [$serviceId, $countryId]
         )->fetchColumn();
-        
+
         $realCostPrice = $usdPrice ? round(floatval($usdPrice) * $quantity, 4) : ($totalCost * 0.7);
         $realProfit = $totalCost - ($realCostPrice * 100);
-        
+
         if ($user['balance'] < $totalCost) {
             apiBadRequest('积分不足');
         }
-        
-        $orderId = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-        );
-        
-        $db->query(
-            "INSERT INTO orders (id, user_id, service_id, country_id, quantity, total_price, cost_price, profit, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
-            [$orderId, $userId, $serviceId, $countryId, $quantity, $totalCost, $realCostPrice, $realProfit]
-        );
-        
+
+        // ========== 批量订单：每条独立 order（共享 batch_id + purchase_expires_at）==========
+        // 业务规则: 整个 batch 共用 purchase_expires_at(3 天,从购买时间算),不能分批激活
+        $batchId = bin2hex(random_bytes(16));  // 32 字符 hex 当 batch_id
+        $purchaseExpireHours = intval(getSetting($db, 'pending_order_expire_hours', '72'));
+        $purchaseExpiresAt = date('Y-m-d H:i:s', time() + $purchaseExpireHours * 3600);
+
+        $createdOrderIds = [];
+        for ($i = 0; $i < $quantity; $i++) {
+            $orderId = $db->insert('orders', [
+                'user_id' => $userId,
+                'service_id' => $serviceId,
+                'country_id' => $countryId,
+                'quantity' => 1,
+                'batch_id' => $batchId,
+                'purchase_expires_at' => $purchaseExpiresAt,
+                'total_price' => $pricePoints,
+                'cost_price' => $realCostPrice / max(1, $quantity),
+                'profit' => $realProfit / max(1, $quantity),
+                'status' => 'pending',
+            ]);
+            $createdOrderIds[] = $orderId;
+        }
+
         $db->query(
             "UPDATE users SET balance = balance - ? WHERE id = ?",
             [$totalCost, $userId]
         );
-        
+
         $balanceAfter = $db->query("SELECT balance FROM users WHERE id = ?", [$userId])->fetchColumn();
-        
-        $txnId = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-            mt_rand(0, 0xffff),
-            mt_rand(0, 0x0fff) | 0x4000,
-            mt_rand(0, 0x3fff) | 0x8000,
-            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-        );
-        
+
         // 使用 insert() 自动生成 UUID 主键 + 补充 balance_before
         $db->insert('credit_transactions', [
-            'id' => $txnId,
             'user_id' => $userId,
             'type' => 'order',
             'amount' => -$totalCost,
             'balance_before' => $balanceAfter + $totalCost,
             'balance_after' => $balanceAfter,
-            'description' => "订单 #$orderId",
+            'description' => "订单 #{$batchId}（{$quantity} 个）",
         ]);
 
         $db->commit();
 
-        logUserActivity($db, $userId, 'create_order', 'order', $orderId);
+        logUserActivity($db, $userId, 'create_order', 'order', $batchId, "quantity={$quantity}");
 
         echo json_encode([
             'success' => true,
             'data' => [
-                'id' => $orderId,
+                'batch_id' => $batchId,
+                'order_ids' => $createdOrderIds,
                 'service_id' => $serviceId,
                 'country_id' => $countryId,
                 'quantity' => $quantity,
                 'price_points' => $pricePoints,
                 'total_cost' => $totalCost,
+                'purchase_expires_at' => $purchaseExpiresAt,
+                'purchase_expire_hours' => $purchaseExpireHours,
                 'status' => 'pending'
             ]
         ]);
@@ -226,9 +248,12 @@ if (preg_match('/^\/orders\/(.+)\/activate$/', $path, $matches) && $method === '
         ]);
     }
 
+    // 用 system_settings.order_timeout 计算 20 分钟倒计时
+    $activationTimeoutMinutes = intval(getSetting($db, 'order_timeout', '20'));
+
     $db->query(
-        "UPDATE orders SET status = 'active', phone_number = ?, hero_order_id = ?, activated_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL 20 MINUTE) WHERE id = ?",
-        [$result['phoneNumber'], $result['heroOrderId'], $orderId]
+        "UPDATE orders SET status = 'active', phone_number = ?, hero_order_id = ?, activated_at = NOW(), expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE) WHERE id = ?",
+        [$result['phoneNumber'], $result['heroOrderId'], $activationTimeoutMinutes, $orderId]
     );
 
     // 通知 HeroSMS 开始等待短信（失败不阻塞，但记录日志）
