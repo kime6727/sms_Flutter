@@ -6,6 +6,32 @@
 $message = '';
 $error = '';
 
+// 自愈:补齐 payment_configs 缺失字段(display_price / is_recommended)
+$schemaFix = __DIR__ . '/../_schema_fix_payment_configs.json';
+$needFix = true;
+if (file_exists($schemaFix) && (time() - filemtime($schemaFix)) < 86400) {
+    $needFix = false;  // 24h 内不再检查
+}
+if ($needFix) {
+    try {
+        $colRows = $db->query("SHOW COLUMNS FROM payment_configs")->fetchAll();
+        $cols = array_map(function($r) { return $r['Field'] ?? $r[0] ?? ''; }, $colRows);
+        $has = in_array('display_price', $cols, true);
+        $hasRec = in_array('is_recommended', $cols, true);
+        if (!$has) {
+            $db->query("ALTER TABLE `payment_configs` ADD COLUMN `display_price` DECIMAL(10,2) DEFAULT '0.00' COMMENT '参考价格(USD)' AFTER `credits`");
+        }
+        if (!$hasRec) {
+            $db->query("ALTER TABLE `payment_configs` ADD COLUMN `is_recommended` TINYINT(1) DEFAULT '0' COMMENT '是否推荐' AFTER `description`");
+            // 索引加 try 容错
+            try { $db->query("ALTER TABLE `payment_configs` ADD KEY `idx_is_recommended` (`is_recommended`)"); } catch (Throwable $e2) {}
+        }
+        @file_put_contents($schemaFix, json_encode(['fixed_at' => date('c'), 'has_display_price' => true, 'has_is_recommended' => true]));
+    } catch (Throwable $e) {
+        error_log('[packages.php schema fix] ' . $e->getMessage());
+    }
+}
+
 // 处理POST请求
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';

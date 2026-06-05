@@ -894,3 +894,15 @@ CREATE TABLE IF NOT EXISTS `password_reset_tokens` (
   INDEX `idx_expires_at` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================
+-- Migration 2.7: 补齐 payment_configs 缺失字段
+--   修复运营后台 packages.php 报错：
+--   "Unknown column 'display_price' / 'is_recommended' in 'field list'"
+--   注:MySQL 5.7 / MariaDB 不支持 IF NOT EXISTS,
+--      此 migration 仅作文档参考,实际由 packages.php 顶部自愈执行
+-- ============================================
+-- ALTER TABLE `payment_configs`
+--   ADD COLUMN `display_price` DECIMAL(10,2) DEFAULT '0.00' COMMENT '参考价格(USD)' AFTER `credits`,
+--   ADD COLUMN `is_recommended` TINYINT(1) DEFAULT '0' COMMENT '是否推荐' AFTER `description`,
+--   ADD KEY `idx_is_recommended` (`is_recommended`);
+
