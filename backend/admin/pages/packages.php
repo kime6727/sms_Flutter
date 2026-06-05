@@ -7,40 +7,58 @@ $message = '';
 $error = '';
 
 // 自愈:补齐 payment_configs 缺失字段(display_price / is_recommended)
-$schemaFix = __DIR__ . '/../_schema_fix_payment_configs.json';
+// 兜底:把所有 NOT NULL 但没有默认值的字段加上 DEFAULT,避免 INSERT 时漏传崩溃
+// 缓存文件 v2:更智能的兜底,覆盖更多 NOT NULL 字段
+$schemaFix = __DIR__ . '/../_schema_fix_payment_configs_v2.json';
 $needFix = true;
 if (file_exists($schemaFix) && (time() - filemtime($schemaFix)) < 86400) {
-    $needFix = false;  // 24h 内不再检查
+    $needFix = false;
 }
 if ($needFix) {
     try {
         $colRows = $db->query("SHOW COLUMNS FROM payment_configs")->fetchAll();
-        $cols = array_map(function($r) { return $r['Field'] ?? $r[0] ?? ''; }, $colRows);
-        $has = in_array('display_price', $cols, true);
-        $hasRec = in_array('is_recommended', $cols, true);
-        // 额外:检查 name 字段是否允许 NULL/有默认值,否则后续 INSERT 必失败
-        $nameNullable = true;
-        foreach ($colRows as $r) {
-            $field = $r['Field'] ?? $r[0] ?? '';
-            if ($field === 'name') {
-                $nullMark = strtoupper($r['Null'] ?? $r[2] ?? 'YES');
-                $defaultVal = $r['Default'] ?? $r[4] ?? null;
-                $nameNullable = ($nullMark === 'YES') || ($defaultVal !== null);
-                break;
-            }
-        }
-        if (!$has) {
+        $colNames = array_map(function($r) { return $r['Field'] ?? $r[0] ?? ''; }, $colRows);
+
+        // 1) 缺字段就加
+        if (!in_array('display_price', $colNames, true)) {
             $db->query("ALTER TABLE `payment_configs` ADD COLUMN `display_price` DECIMAL(10,2) DEFAULT '0.00' COMMENT '参考价格(USD)' AFTER `credits`");
         }
-        if (!$hasRec) {
+        if (!in_array('is_recommended', $colNames, true)) {
             $db->query("ALTER TABLE `payment_configs` ADD COLUMN `is_recommended` TINYINT(1) DEFAULT '0' COMMENT '是否推荐' AFTER `description`");
             try { $db->query("ALTER TABLE `payment_configs` ADD KEY `idx_is_recommended` (`is_recommended`)"); } catch (Throwable $e2) {}
         }
-        // name 字段兜底:让 name 有默认值,避免 INSERT 时漏传
-        if (!$nameNullable) {
-            try { $db->query("ALTER TABLE `payment_configs` MODIFY COLUMN `name` VARCHAR(255) NOT NULL DEFAULT ''"); } catch (Throwable $e3) {}
+
+        // 2) 兜底:任何 NOT NULL 且无默认值的字段,自动 MODIFY 加默认 ''
+        //    (name / price / product_id / credits 都属于高风险列)
+        $colType = [];
+        foreach ($colRows as $r) {
+            $field = $r['Field'] ?? $r[0] ?? '';
+            $type = $r['Type'] ?? $r[1] ?? '';
+            $nullMark = strtoupper($r['Null'] ?? $r[2] ?? 'YES');
+            $defaultVal = $r['Default'] ?? $r[4] ?? null;
+            $colType[$field] = ['type' => $type, 'null' => $nullMark, 'default' => $defaultVal];
         }
-        @file_put_contents($schemaFix, json_encode(['fixed_at' => date('c'), 'has_display_price' => true, 'has_is_recommended' => true]));
+
+        foreach ($colType as $field => $info) {
+            // MySQL SHOW COLUMNS 把"无默认值"显示为 NULL 或字符串 "NULL" 视 server 而定
+            $hasDefault = ($info['default'] !== null && $info['default'] !== 'NULL' && $info['default'] !== '');
+            if ($info['null'] === 'NO' && !$hasDefault) {
+                $typeLower = strtolower($info['type']);
+                if (strpos($typeLower, 'int') !== false || strpos($typeLower, 'decimal') !== false || strpos($typeLower, 'float') !== false || strpos($typeLower, 'double') !== false) {
+                    $default = "'0'";
+                } else {
+                    $default = "''";
+                }
+                try {
+                    $db->query("ALTER TABLE `payment_configs` MODIFY COLUMN `{$field}` {$info['type']} NOT NULL DEFAULT {$default}");
+                    error_log("[packages.php schema fix] MODIFY {$field} DEFAULT {$default}");
+                } catch (Throwable $e3) {
+                    error_log("[packages.php schema fix] MODIFY {$field} failed: " . $e3->getMessage());
+                }
+            }
+        }
+
+        @file_put_contents($schemaFix, json_encode(['fixed_at' => date('c')]));
     } catch (Throwable $e) {
         error_log('[packages.php schema fix] ' . $e->getMessage());
     }
@@ -55,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $configName = trim($_POST['config_name'] ?? '');
         $credits = intval($_POST['credits'] ?? 0);
         $displayPrice = floatval($_POST['display_price'] ?? 0);
+        $price = floatval($_POST['price'] ?? $displayPrice);
         $description = trim($_POST['description'] ?? '');
         $isRecommended = isset($_POST['is_recommended']) ? 1 : 0;
         $active = isset($_POST['active']) ? 1 : 0;
@@ -68,8 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = '产品ID已存在';
                 } else {
                     $db->query(
-                        "INSERT INTO payment_configs (product_id, name, config_name, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        [$productId, $configName, $configName, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
+                        "INSERT INTO payment_configs (product_id, name, config_name, price, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        [$productId, $configName, $configName, $price, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
                     );
                     $message = '套餐已创建';
                 }
