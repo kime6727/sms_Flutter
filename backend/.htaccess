@@ -60,7 +60,7 @@ AddType text/plain .txt
     # XSS 保护
     Header always set X-Frame-Options "SAMEORIGIN"
     # 内容安全策略 - 允许前端跨域请求 API
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://smsapi2.niceapp.eu.cc https://cdn.hero-sms.com data: blob:; connect-src 'self' https://smsapi2.niceapp.eu.cc http://localhost:* http://127.0.0.1:*; font-src 'self' data:;"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://sms.niceapp.eu.cc https://cdn.hero-sms.com data: blob:; connect-src 'self' https://sms.niceapp.eu.cc http://localhost:* http://127.0.0.1:*; font-src 'self' data:;"
 </IfModule>
 
 # PHP 设置（如果允许）

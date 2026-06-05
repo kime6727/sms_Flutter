@@ -18,6 +18,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../lib/Database.php';
 require_once __DIR__ . '/../lib/HeroSMS.php';
 require_once __DIR__ . '/../lib/KeyManager.php';
+require_once __DIR__ . '/../helpers/functions.php';
 
 // 初始化
 $db = new Database(DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT);
@@ -45,6 +46,10 @@ function logMessage($message) {
 
 logMessage("开始检查超时订单");
 
+// 读取配置：激活超时分钟数 / 购买未激活过期小时数
+$activationTimeoutMinutes = intval(getSetting($db, 'order_timeout', '20'));
+$pendingExpireHours = intval(getSetting($db, 'pending_order_expire_hours', '72'));
+
 // ============================================
 // 1. 检查 active 订单是否超过 20 分钟
 // ============================================
@@ -67,55 +72,22 @@ foreach ($activeOrders as $order) {
 
     logMessage("处理超时订单: $orderId (HeroID: $heroOrderId, 过期时间: {$order['expires_at']})");
 
-    // 使用事务确保退款和状态更新一致
+    // 业务规则:激活后未在超时时间内收到验证码 = 订单过期,**积分不退**
+    // 原因:号码已分配给 HeroSMS 平台,平台已收取费用
     $db->beginTransaction();
     try {
-        // 标记为过期（号码已超时，未收到短信，应退积分）
+        // 标记为过期（不退积分）
         $db->query(
             "UPDATE orders SET status = 'expired', updated_at = NOW() WHERE id = ?",
             [$orderId]
         );
 
-        // 退款
-        if ($totalPrice > 0) {
-            $db->query(
-                "UPDATE users SET balance = balance + ? WHERE id = ?",
-                [$totalPrice, $userId]
-            );
-
-            $balanceAfter = $db->query(
-                "SELECT balance FROM users WHERE id = ?",
-                [$userId]
-            )->fetchColumn();
-
-            // 生成退款交易记录
-            $refundTxnId = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-                mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-                mt_rand(0, 0xffff),
-                mt_rand(0, 0x0fff) | 0x4000,
-                mt_rand(0, 0x3fff) | 0x8000,
-                mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-            );
-
-            $db->insert('credit_transactions', [
-                'id' => $refundTxnId,
-                'user_id' => $userId,
-                'type' => 'refund',
-                'amount' => $totalPrice,
-                'balance_after' => $balanceAfter,
-                'description' => "订单 #$orderId 超时自动退款",
-                'created_at' => date('Y-m-d H:i:s')
-            ]);
-
-            logMessage("订单 $orderId 已退款 $totalPrice 积分");
-        }
-
         $db->commit();
     } catch (Exception $e) {
         $db->rollBack();
-        logMessage("订单 $orderId 退款事务失败: " . $e->getMessage());
+        logMessage("订单 $orderId 状态更新失败: " . $e->getMessage());
     }
-    
+
     // 取消 HeroSMS 号码（释放资源）
     if ($heroSMS && $heroOrderId) {
         try {
@@ -129,34 +101,34 @@ foreach ($activeOrders as $order) {
             logMessage("订单 $orderId 取消 HeroSMS 号码异常: " . $e->getMessage());
         }
     }
-    
-    // 发送过期通知
+
+    // 发送过期通知（提示用户,不再说"积分退回"）
     try {
         $orderInfo = $db->query(
             "SELECT user_id, service_id, country_id FROM orders WHERE id = ?",
             [$orderId]
         )->fetch();
-        
+
         if ($orderInfo) {
             $serviceInfo = $db->query(
                 "SELECT name FROM services WHERE id = ?",
                 [$orderInfo['service_id']]
             )->fetchColumn();
-            
+
             $countryInfo = $db->query(
                 "SELECT name FROM countries WHERE id = ?",
                 [$orderInfo['country_id']]
             )->fetchColumn();
-            
+
             $db->insert('notifications', [
                 'user_id' => $orderInfo['user_id'],
                 'type' => 'order_expired',
-                'title' => '号码使用已过期',
-                'body' => "订单 #{$orderId} 中的 {$serviceInfo} - {$countryInfo} 已超过20分钟未收到验证码，订单已过期，积分已退回",
+                'title' => '订单已过期',
+                'body' => "订单 #{$orderId} 中的 {$serviceInfo} - {$countryInfo} 已超过 {$activationTimeoutMinutes} 分钟未收到验证码,订单已过期(号码资源已被占用,积分不予退还)",
                 'related_order_id' => $orderId,
                 'created_at' => date('Y-m-d H:i:s')
             ]);
-            
+
             logMessage("订单 $orderId 过期通知已发送");
         }
     } catch (Exception $e) {
@@ -165,13 +137,17 @@ foreach ($activeOrders as $order) {
 }
 
 // ============================================
-// 2. 检查 pending 订单是否超过 24 小时未激活
+// 2. 检查 pending 订单是否超过 N 小时未激活（默认 72 = 3 天）
 // ============================================
 $pendingOrders = $db->query(
-    "SELECT id, user_id, service_id, country_id, total_price, created_at
+    "SELECT id, user_id, service_id, country_id, total_price, purchase_expires_at, created_at
      FROM orders
      WHERE status = 'pending'
-     AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)"
+     AND (
+         (purchase_expires_at IS NOT NULL AND purchase_expires_at < NOW())
+         OR (purchase_expires_at IS NULL AND created_at < DATE_SUB(NOW(), INTERVAL ? HOUR))
+     )",
+    [$pendingExpireHours]
 )->fetchAll();
 
 logMessage("发现 " . count($pendingOrders) . " 个超时的 pending 订单");
@@ -183,7 +159,7 @@ foreach ($pendingOrders as $order) {
 
     logMessage("处理过期 pending 订单: $orderId");
 
-    // 使用事务确保退款和状态更新一致
+    // 业务规则: 购买后未在 N 小时内激活 = 订单过期,**积分不退**
     $db->beginTransaction();
     try {
         $db->query(
@@ -191,66 +167,33 @@ foreach ($pendingOrders as $order) {
             [$orderId]
         );
 
-        // 退款
-        if ($totalPrice > 0) {
-            $db->query(
-                "UPDATE users SET balance = balance + ? WHERE id = ?",
-                [$totalPrice, $userId]
-            );
-
-            $balanceAfter = $db->query(
-                "SELECT balance FROM users WHERE id = ?",
-                [$userId]
-            )->fetchColumn();
-
-            $refundTxnId = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-                mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-                mt_rand(0, 0xffff),
-                mt_rand(0, 0x0fff) | 0x4000,
-                mt_rand(0, 0x3fff) | 0x8000,
-                mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-            );
-
-            $db->insert('credit_transactions', [
-                'id' => $refundTxnId,
-                'user_id' => $userId,
-                'type' => 'refund',
-                'amount' => $totalPrice,
-                'balance_after' => $balanceAfter,
-                'description' => "订单 #$orderId 超时自动退款",
-                'created_at' => date('Y-m-d H:i:s')
-            ]);
-
-            logMessage("订单 $orderId 已退款 $totalPrice 积分");
-        }
-
         $db->commit();
     } catch (Exception $e) {
         $db->rollBack();
-        logMessage("订单 $orderId 退款事务失败: " . $e->getMessage());
+        logMessage("订单 $orderId 状态更新失败: " . $e->getMessage());
     }
-    
+
     // 发送过期通知
     try {
         $serviceInfo = $db->query(
             "SELECT name FROM services WHERE id = ?",
             [$order['service_id']]
         )->fetchColumn();
-        
+
         $countryInfo = $db->query(
             "SELECT name FROM countries WHERE id = ?",
             [$order['country_id']]
         )->fetchColumn();
-        
+
         $db->insert('notifications', [
-            'user_id' => $order['user_id'],
+            'user_id' => $userId,
             'type' => 'order_expired',
             'title' => '订单已过期',
-            'body' => "订单 #{$orderId} 中的 {$serviceInfo} - {$countryInfo} 已超过24小时未激活，订单已过期，积分已退回",
+            'body' => "订单 #{$orderId} 中的 {$serviceInfo} - {$countryInfo} 已超过 {$pendingExpireHours} 小时未激活,订单已过期(积分不予退还)",
             'related_order_id' => $orderId,
             'created_at' => date('Y-m-d H:i:s')
         ]);
-        
+
         logMessage("订单 $orderId 过期通知已发送");
     } catch (Exception $e) {
         logMessage("发送通知失败: " . $e->getMessage());

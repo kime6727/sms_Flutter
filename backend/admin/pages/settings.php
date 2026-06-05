@@ -71,12 +71,12 @@ foreach ($settings as $s) {
             <div>
                 <label style="display:block;margin-bottom:6px;color:#64748b;font-size:14px;">待使用订单过期时间(小时)</label>
                 <input type="number" name="settings[pending_order_expire_hours]" value="<?= $settingsMap['pending_order_expire_hours'] ?? '72' ?>" min="1" max="720" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
-                <small style="color:#94a3b8;">待使用(pending)订单超过此时长将自动变为已过期(expired)，积分不退还</small>
+                <small style="color:#94a3b8;">待使用(pending)订单超过此时长将自动变为已过期(expired)。批量订单共用此时间,购买成功后开始计时。<b style="color:#dc2626;">积分不予退还</b>。</small>
             </div>
             <div>
                 <label style="display:block;margin-bottom:6px;color:#64748b;font-size:14px;">订单超时时间(分钟)</label>
-                <input type="number" name="settings[order_timeout]" value="<?= $settingsMap['order_timeout'] ?? 20 ?>" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
-                <small style="color:#94a3b8;">激活后等待短信的超时时长</small>
+                <input type="number" name="settings[order_timeout]" value="<?= $settingsMap['order_timeout'] ?? 20 ?>" min="1" max="60" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+                <small style="color:#94a3b8;">激活后等待短信的超时时长。超时后订单自动过期,<b style="color:#dc2626;">号码资源已被占用,积分不予退还</b>。</small>
             </div>
             <div>
                 <label style="display:block;margin-bottom:6px;color:#64748b;font-size:14px;">HeroSMS API Key</label>
