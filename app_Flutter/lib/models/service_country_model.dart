@@ -13,6 +13,8 @@ class ServiceCountryModel {
   final String? serviceName;
   final String? serviceNameEn;
   final String? serviceIcon;
+  final String? serviceCode;
+  final String? heroCountryId;
   final String? countryName;
   final String? countryNameEn;
   final String? countryCode;
@@ -33,6 +35,8 @@ class ServiceCountryModel {
     this.serviceName,
     this.serviceNameEn,
     this.serviceIcon,
+    this.serviceCode,
+    this.heroCountryId,
     this.countryName,
     this.countryNameEn,
     this.countryCode,
@@ -55,6 +59,8 @@ class ServiceCountryModel {
       serviceName: json['service_name'],
       serviceNameEn: json['service_name_en'],
       serviceIcon: json['service_icon'],
+      serviceCode: json['service_code']?.toString(),
+      heroCountryId: json['hero_country_id']?.toString(),
       countryName: json['name'] ?? json['country_name'],
       countryNameEn: json['name_en'] ?? json['country_name_en'],
       countryCode: json['code'] ?? json['country_code'],

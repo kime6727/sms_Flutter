@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/i18n/app_localizations.dart';
+import '../../widgets/cms_image.dart';
 import '../../providers/service_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/service_country_model.dart';
@@ -104,41 +105,14 @@ class _CountryCard extends StatelessWidget {
           child: Row(
             children: [
               // Flag
-              Container(
+              CmsImage(
+                kind: 'country',
+                heroId: serviceCountry.heroCountryId,
+                fallbackText: serviceCountry.countryFlagEmoji ?? (serviceCountry.countryCode ?? '?').toUpperCase(),
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: serviceCountry.localCountryFlag.isNotEmpty
-                    ? Image.network(
-                        serviceCountry.localCountryFlag,
-                        fit: BoxFit.cover,
-                        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                          if (frame == null) {
-                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-                          }
-                          return child;
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Center(
-                            child: Text(
-                              serviceCountry.countryFlagEmoji ?? '🌍',
-                              style: const TextStyle(fontSize: 28),
-                            ),
-                          );
-                        },
-                      )
-                    : Center(
-                        child: Text(
-                          serviceCountry.countryFlagEmoji ?? '🌍',
-                          style: const TextStyle(fontSize: 28),
-                        ),
-                      ),
-                ),
+                borderRadius: BorderRadius.circular(8),
+                fit: BoxFit.cover,
               ),
               const SizedBox(width: 12),
               // Country name and phone number

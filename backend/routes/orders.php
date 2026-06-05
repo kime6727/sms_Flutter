@@ -33,8 +33,8 @@ if (preg_match('/^\/orders$/', $path) && $method === 'GET') {
         apiBadRequest('user_id 参数缺失');
     }
 
-    $sql = "SELECT o.*, s.name as service_name, s.name_en as service_name_en, s.code as service_code,
-               c.name as country_name, c.name_en as country_name_en, c.hero_country_id,
+    $sql = "SELECT o.*, s.name as service_name, s.name_en as service_name_en, s.hero_service_id as service_code,
+               c.name as country_name, c.name_en as country_name_en, c.hero_country_id, c.code as country_code,
                COALESCE(o.total_price, o.total_cost, 0) as total_cost, ROUND(COALESCE(o.total_price, o.total_cost, 0) / o.quantity) as price_points,
                (SELECT code FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_code,
                (SELECT received_at FROM sms_messages WHERE order_id = o.id ORDER BY received_at ASC LIMIT 1) as sms_received_at

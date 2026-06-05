@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/service_provider.dart';
 import '../../providers/banner_provider.dart';
 import '../../models/service_model.dart';
+import '../../widgets/cms_image.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/banner_carousel.dart';
 
@@ -320,31 +321,14 @@ class _ServiceCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
+              CmsImage(
+                kind: 'service',
+                heroId: service.heroCode,
+                fallbackText: service.displayName.isEmpty ? '?' : service.displayName.characters.first.toUpperCase(),
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: service.localIcon.isNotEmpty
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          service.localIcon,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.sim_card,
-                              color: AppColors.primary,
-                            );
-                          },
-                        ),
-                      )
-                    : const Icon(
-                        Icons.sim_card,
-                        color: AppColors.primary,
-                      ),
+                borderRadius: BorderRadius.circular(12),
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 8),
               Text(

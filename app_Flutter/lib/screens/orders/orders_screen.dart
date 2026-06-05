@@ -300,7 +300,8 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // 判断是否是接码失败（completed 但没有短信）
     final bool isSmsFailed = order.status == 'completed' && order.smsCode == null;
-    
+    final bool isBatch = order.batchId != null && order.batchId!.isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -311,16 +312,48 @@ class _OrderCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (isBatch)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '批量订单 · ${order.batchId!.substring(0, 8)}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Row(
                 children: [
                   CmsImage(
+                    kind: 'service',
+                    heroId: order.serviceCode,
+                    fallbackText: (order.serviceName ?? '?').isEmpty ? '?' : (order.serviceName ?? '?').characters.first.toUpperCase(),
+                    width: 36,
+                    height: 36,
+                    borderRadius: BorderRadius.circular(10),
+                    fit: BoxFit.contain,
+                  ),
+                  const SizedBox(width: 10),
+                  CmsImage(
                     kind: 'country',
                     heroId: order.heroCountryId,
-                    fallbackText: (order.countryCode ?? order.countryDisplayName).isEmpty
+                    fallbackText: (order.countryCode ?? order.countryName ?? '?').isEmpty
                         ? '?'
                         : ((order.countryCode?.isNotEmpty == true)
                             ? order.countryCode!.toUpperCase()
-                            : order.countryDisplayName.characters.first.toUpperCase()),
+                            : (order.countryName ?? '?').characters.first.toUpperCase()),
                     width: 48,
                     height: 48,
                     borderRadius: BorderRadius.circular(12),
@@ -332,7 +365,7 @@ class _OrderCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.serviceDisplayName,
+                          order.serviceName ?? '',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -340,7 +373,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          order.countryDisplayName,
+                          order.countryName ?? '',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.secondary,
                             fontSize: 14,

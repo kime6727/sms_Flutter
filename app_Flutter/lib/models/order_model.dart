@@ -25,6 +25,7 @@ class OrderModel {
   final String? countryCode;
   final String? countryFlag;
   final String? heroCountryId;
+  final String? batchId;
 
   OrderModel({
     required this.id,
@@ -50,6 +51,7 @@ class OrderModel {
     this.countryCode,
     this.countryFlag,
     this.heroCountryId,
+    this.batchId,
   });
 
   /// 不可变更新：仅修改传入的非空字段，避免 30+ 行的手动重建
@@ -77,6 +79,7 @@ class OrderModel {
     String? countryCode,
     String? countryFlag,
     String? heroCountryId,
+    String? batchId,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -102,6 +105,7 @@ class OrderModel {
       countryCode: countryCode ?? this.countryCode,
       countryFlag: countryFlag ?? this.countryFlag,
       heroCountryId: heroCountryId ?? this.heroCountryId,
+      batchId: batchId ?? this.batchId,
     );
   }
 
@@ -148,6 +152,7 @@ class OrderModel {
       countryCode: json['country_code']?.toString(),
       countryFlag: json['country_flag']?.toString(),
       heroCountryId: json['hero_country_id']?.toString(),
+      batchId: json['batch_id']?.toString(),
     );
   }
 

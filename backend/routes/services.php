@@ -6,14 +6,17 @@
 // 获取服务列表
 if ($path === '/services' && $method === 'GET') {
     $services = $db->query("SELECT * FROM services WHERE is_published = 1 ORDER BY sort_order ASC, id ASC")->fetchAll();
-    
+
     $services = array_map(function($service) {
+        // hero_code 字段供客户端用 CDN 拼图标 URL（hero_service_id）
+        $service['hero_code'] = $service['hero_service_id'] ?? '';
+        // icon 字段保留但优先用 hero_code 拼 URL
         if (!empty($service['icon'])) {
             $service['icon'] = getLocalImageUrl($service['icon'], '/pic/fuwu/');
         }
         return $service;
     }, $services);
-    
+
     echo json_encode(['success' => true, 'data' => $services]);
     exit;
 }
@@ -40,8 +43,8 @@ if ($path === '/service-countries' && $method === 'GET') {
     $userId = $_GET['user_id'] ?? null;
     
     $sql = "SELECT sc.id, sc.service_id, sc.country_id, sc.price, sc.is_published, sc.is_active,
-                   s.name as service_name, s.name_en as service_name_en, s.name_cn as service_name_cn, s.icon as service_icon,
-                   c.name as country_name, c.name_en as country_name_en, c.name_cn as country_name_cn, c.code as country_code, c.flag as country_flag, c.phone_code
+                   s.name as service_name, s.name_en as service_name_en, s.name_cn as service_name_cn, s.icon as service_icon, s.hero_service_id as service_code,
+                   c.name as country_name, c.name_en as country_name_en, c.name_cn as country_name_cn, c.code as country_code, c.flag as country_flag, c.phone_code, c.hero_country_id
             FROM service_countries sc
             LEFT JOIN services s ON sc.service_id = s.id
             LEFT JOIN countries c ON sc.country_id = c.id
@@ -65,9 +68,8 @@ if ($path === '/service-countries' && $method === 'GET') {
         if (!empty($sc['service_icon'])) {
             $sc['service_icon'] = getLocalImageUrl($sc['service_icon'], '/pic/fuwu/');
         }
-        if (!empty($sc['country_flag'])) {
-            $sc['country_flag'] = getLocalImageUrl($sc['country_flag'], '/pic/country/');
-        }
+        // country_flag / hero_country_id: hero_country_id 直接给客户端用 CDN 拼 URL
+        // country_flag 字段为 null 时不返回空 URL
         return $sc;
     }, $serviceCountries);
     
@@ -82,8 +84,8 @@ if ($path === '/service-countries/published' && $method === 'GET') {
     $userId = $_GET['user_id'] ?? null;
     
     $sql = "SELECT sc.id, sc.service_id, sc.country_id, sc.price, sc.is_published, sc.is_active,
-                   s.name as service_name, s.name_en as service_name_en, s.name_cn as service_name_cn, s.icon as service_icon,
-                   c.name as country_name, c.name_en as country_name_en, c.name_cn as country_name_cn, c.code as country_code, c.flag as country_flag, c.phone_code
+                   s.name as service_name, s.name_en as service_name_en, s.name_cn as service_name_cn, s.icon as service_icon, s.hero_service_id as service_code,
+                   c.name as country_name, c.name_en as country_name_en, c.name_cn as country_name_cn, c.code as country_code, c.flag as country_flag, c.phone_code, c.hero_country_id
             FROM service_countries sc
             LEFT JOIN services s ON sc.service_id = s.id
             LEFT JOIN countries c ON sc.country_id = c.id
@@ -125,9 +127,8 @@ if ($path === '/service-countries/published' && $method === 'GET') {
         if (!empty($sc['service_icon'])) {
             $sc['service_icon'] = getLocalImageUrl($sc['service_icon'], '/pic/fuwu/');
         }
-        if (!empty($sc['country_flag'])) {
-            $sc['country_flag'] = getLocalImageUrl($sc['country_flag'], '/pic/country/');
-        }
+        // country_flag / hero_country_id: hero_country_id 直接给客户端用 CDN 拼 URL
+        // country_flag 字段为 null 时不返回空 URL
         
         // 计算积分价格: price(美元) * 100(转为分) * 系数
         $basePriceCents = floatval($sc['price']) * 100;
