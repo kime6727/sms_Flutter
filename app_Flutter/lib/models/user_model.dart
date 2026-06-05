@@ -40,16 +40,12 @@ class UserModel {
       id: json['id']?.toString() ?? '',
       username: json['username']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      points: json['points'] ?? json['balance'] ?? 0,
-      totalSpent: (json['total_spent'] is num)
-          ? (json['total_spent'] as num).toDouble()
-          : double.tryParse(json['total_spent']?.toString() ?? '0') ?? 0.0,
-      orderCount: json['order_count'] ?? 0,
-      hasTopupHistory: json['has_topup_history'] ?? false,
+      points: _toInt(json['points'] ?? json['balance']) ?? 0,
+      totalSpent: _toDouble(json['total_spent']) ?? 0.0,
+      orderCount: _toInt(json['order_count']) ?? 0,
+      hasTopupHistory: json['has_topup_history'] == true,
       firstTopupExpiresAt: json['first_topup_expires_at']?.toString(),
-      firstTopupCountdownHours: (json['first_topup_countdown_hours'] ?? 0) is int
-          ? json['first_topup_countdown_hours']
-          : (json['first_topup_countdown_hours'] as num?)?.toInt() ?? 0,
+      firstTopupCountdownHours: _toInt(json['first_topup_countdown_hours']) ?? 0,
       membership: json['membership'] != null ? MembershipInfo.fromJson(json['membership']) : null,
       nextLevel: json['next_level'] != null ? NextLevelInfo.fromJson(json['next_level']) : null,
       progress: json['progress'] != null ? ProgressInfo.fromJson(json['progress']) : null,
@@ -59,6 +55,21 @@ class UserModel {
       createdAt: json['created_at']?.toString() ?? '',
       updatedAt: json['updated_at']?.toString() ?? '',
     );
+  }
+
+  // 安全类型转换 helper：兼容 int / double / num / string / null
+  static int? _toInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
+
+  static double? _toDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
   }
 
   Map<String, dynamic> toJson() {

@@ -208,6 +208,11 @@ class AuthProvider extends ChangeNotifier {
       }
       _error = response['message'] ?? 'Registration failed';
       return null;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _isAuthenticated = false;
+      notifyListeners();
+      return null;
     } catch (e) {
       _error = 'Network error: $e';
       return null;
