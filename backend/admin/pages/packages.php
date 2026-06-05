@@ -9,7 +9,7 @@ $error = '';
 // 处理POST请求
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-    
+
     if ($action === 'create') {
         $productId = trim($_POST['product_id'] ?? '');
         $configName = trim($_POST['config_name'] ?? '');
@@ -18,19 +18,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
         $isRecommended = isset($_POST['is_recommended']) ? 1 : 0;
         $active = isset($_POST['active']) ? 1 : 0;
-        
+
         if (!$productId || !$configName || $credits <= 0) {
             $error = '请填写必填字段（产品ID、商品名称、积分）';
         } else {
-            $exists = $db->query("SELECT id FROM payment_configs WHERE product_id = ?", [$productId])->fetch();
-            if ($exists) {
-                $error = '产品ID已存在';
-            } else {
-                $db->query(
-                    "INSERT INTO payment_configs (product_id, config_name, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    [$productId, $configName, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
-                );
-                $message = '套餐已创建';
+            try {
+                $exists = $db->query("SELECT id FROM payment_configs WHERE product_id = ?", [$productId])->fetch();
+                if ($exists) {
+                    $error = '产品ID已存在';
+                } else {
+                    $db->query(
+                        "INSERT INTO payment_configs (product_id, config_name, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        [$productId, $configName, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
+                    );
+                    $message = '套餐已创建';
+                }
+            } catch (Throwable $e) {
+                $error = '创建失败：' . $e->getMessage();
+                error_log('[packages.php create] ' . $e->getMessage());
             }
         }
     } elseif ($action === 'update') {
@@ -41,29 +46,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = trim($_POST['description'] ?? '');
         $isRecommended = isset($_POST['is_recommended']) ? 1 : 0;
         $active = isset($_POST['active']) ? 1 : 0;
-        
+
         if (!$configName || $credits <= 0) {
             $error = '请填写必填字段';
         } else {
-            $db->query(
-                "UPDATE payment_configs SET config_name = ?, credits = ?, display_price = ?, description = ?, is_recommended = ?, active = ? WHERE id = ?",
-                [$configName, $credits, $displayPrice, $description, $isRecommended, $active, $id]
-            );
-            $message = '套餐已更新';
+            try {
+                $db->query(
+                    "UPDATE payment_configs SET config_name = ?, credits = ?, display_price = ?, description = ?, is_recommended = ?, active = ? WHERE id = ?",
+                    [$configName, $credits, $displayPrice, $description, $isRecommended, $active, $id]
+                );
+                $message = '套餐已更新';
+            } catch (Throwable $e) {
+                $error = '更新失败：' . $e->getMessage();
+                error_log('[packages.php update] ' . $e->getMessage());
+            }
         }
     } elseif ($action === 'delete') {
         $id = intval($_POST['id'] ?? 0);
-        $db->query("DELETE FROM payment_configs WHERE id = ?", [$id]);
-        $message = '套餐已删除';
+        try {
+            $db->query("DELETE FROM payment_configs WHERE id = ?", [$id]);
+            $message = '套餐已删除';
+        } catch (Throwable $e) {
+            $error = '删除失败：' . $e->getMessage();
+        }
     } elseif ($action === 'toggle_recommended') {
         $id = intval($_POST['id'] ?? 0);
-        $db->query("UPDATE payment_configs SET is_recommended = NOT is_recommended WHERE id = ?", [$id]);
-        $message = '推荐状态已切换';
+        try {
+            $db->query("UPDATE payment_configs SET is_recommended = NOT is_recommended WHERE id = ?", [$id]);
+            $message = '推荐状态已切换';
+        } catch (Throwable $e) {
+            $error = '操作失败：' . $e->getMessage();
+        }
     }
+}
+
+// 发生错误时，POST 后不直接 exit，而是重定向回 GET 页面，让 UI 看到 $error / $message
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($message || $error)) {
+    $_SESSION['flash_message'] = $message;
+    $_SESSION['flash_error'] = $error;
+    header('Location: index.php?page=packages');
+    exit;
 }
 
 // 获取所有套餐
 $packages = $db->query("SELECT * FROM payment_configs ORDER BY credits ASC")->fetchAll();
+
+// 从 session 取 flash
+if (!empty($_SESSION['flash_message'])) {
+    $message = $_SESSION['flash_message'];
+    unset($_SESSION['flash_message']);
+}
+if (!empty($_SESSION['flash_error'])) {
+    $error = $_SESSION['flash_error'];
+    unset($_SESSION['flash_error']);
+}
 ?>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
