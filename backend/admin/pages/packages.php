@@ -18,13 +18,27 @@ if ($needFix) {
         $cols = array_map(function($r) { return $r['Field'] ?? $r[0] ?? ''; }, $colRows);
         $has = in_array('display_price', $cols, true);
         $hasRec = in_array('is_recommended', $cols, true);
+        // 额外:检查 name 字段是否允许 NULL/有默认值,否则后续 INSERT 必失败
+        $nameNullable = true;
+        foreach ($colRows as $r) {
+            $field = $r['Field'] ?? $r[0] ?? '';
+            if ($field === 'name') {
+                $nullMark = strtoupper($r['Null'] ?? $r[2] ?? 'YES');
+                $defaultVal = $r['Default'] ?? $r[4] ?? null;
+                $nameNullable = ($nullMark === 'YES') || ($defaultVal !== null);
+                break;
+            }
+        }
         if (!$has) {
             $db->query("ALTER TABLE `payment_configs` ADD COLUMN `display_price` DECIMAL(10,2) DEFAULT '0.00' COMMENT '参考价格(USD)' AFTER `credits`");
         }
         if (!$hasRec) {
             $db->query("ALTER TABLE `payment_configs` ADD COLUMN `is_recommended` TINYINT(1) DEFAULT '0' COMMENT '是否推荐' AFTER `description`");
-            // 索引加 try 容错
             try { $db->query("ALTER TABLE `payment_configs` ADD KEY `idx_is_recommended` (`is_recommended`)"); } catch (Throwable $e2) {}
+        }
+        // name 字段兜底:让 name 有默认值,避免 INSERT 时漏传
+        if (!$nameNullable) {
+            try { $db->query("ALTER TABLE `payment_configs` MODIFY COLUMN `name` VARCHAR(255) NOT NULL DEFAULT ''"); } catch (Throwable $e3) {}
         }
         @file_put_contents($schemaFix, json_encode(['fixed_at' => date('c'), 'has_display_price' => true, 'has_is_recommended' => true]));
     } catch (Throwable $e) {
@@ -54,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = '产品ID已存在';
                 } else {
                     $db->query(
-                        "INSERT INTO payment_configs (product_id, config_name, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        [$productId, $configName, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
+                        "INSERT INTO payment_configs (product_id, name, config_name, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        [$productId, $configName, $configName, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
                     );
                     $message = '套餐已创建';
                 }
