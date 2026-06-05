@@ -136,7 +136,12 @@ if (($_GET['action'] ?? '') === 'toggle' && ($_GET['id'] ?? null)) {
     $current = $db->query("SELECT active FROM countries WHERE id = ?", [$id])->fetch();
     if ($current) {
         $newStatus = $current['active'] ? 0 : 1;
-        $db->query("UPDATE countries SET active = ? WHERE id = ?", [$newStatus, $id]);
+        try {
+            $db->query("UPDATE countries SET active = ? WHERE id = ?", [$newStatus, $id]);
+        } catch (Throwable $e) {
+            error_log('[countries.php toggle] ' . $e->getMessage());
+            $_SESSION['flash_error'] = '切换状态失败：' . $e->getMessage();
+        }
     }
     header('Location: ?page=countries');
     exit;
@@ -144,11 +149,18 @@ if (($_GET['action'] ?? '') === 'toggle' && ($_GET['id'] ?? null)) {
 
 // 更新国家信息
 if (($_POST['action'] ?? '') === 'update_name' && ($_POST['id'] ?? null)) {
-    $db->query(
-        "UPDATE countries SET name_cn = ?, name_en = ?, flag = ?, phone_code = ? WHERE id = ?",
-        [$_POST['name_cn'], $_POST['name_en'], $_POST['flag'], $_POST['phone_code'], intval($_POST['id'])]
-    );
-    $success = '国家信息已更新';
+    try {
+        $db->query(
+            "UPDATE countries SET name_cn = ?, name_en = ?, flag = ?, phone_code = ? WHERE id = ?",
+            [$_POST['name_cn'], $_POST['name_en'], $_POST['flag'], $_POST['phone_code'], intval($_POST['id'])]
+        );
+        $_SESSION['flash_success'] = '国家信息已更新';
+    } catch (Throwable $e) {
+        error_log('[countries.php update_name] ' . $e->getMessage());
+        $_SESSION['flash_error'] = '更新失败：' . $e->getMessage();
+    }
+    header('Location: ?page=countries');
+    exit;
 }
 
 $countries = $db->query("SELECT * FROM countries ORDER BY id")->fetchAll();

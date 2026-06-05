@@ -3,36 +3,52 @@ $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (($_POST['action'] ?? '') === 'update_default') {
-        $before = floatval($_POST['default_coefficient_before'] ?? 3);
-        $after = floatval($_POST['default_coefficient_after'] ?? 2);
-        $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_before', ?) ON DUPLICATE KEY UPDATE `value` = ?", [$before, $before]);
-        $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_after', ?) ON DUPLICATE KEY UPDATE `value` = ?", [$after, $after]);
-        $message = '默认系数已更新';
-    } elseif (($_POST['action'] ?? '') === 'update_service') {
-        $serviceId = intval($_POST['service_id'] ?? 0);
-        $coefBefore = ($_POST['coefficient_before'] ?? '') !== '' ? floatval($_POST['coefficient_before']) : null;
-        $coefAfter = ($_POST['coefficient_after'] ?? '') !== '' ? floatval($_POST['coefficient_after']) : null;
-        
-        $existing = $db->query("SELECT id FROM service_coefficients WHERE service_id = ?", [$serviceId])->fetch();
-        
-        if ($coefBefore === null && $coefAfter === null) {
-            if ($existing) {
-                $db->query("DELETE FROM service_coefficients WHERE service_id = ?", [$serviceId]);
-            }
-        } else {
-            if ($existing) {
-                $db->query("UPDATE service_coefficients SET coefficient_before = ?, coefficient_after = ?, updated_at = NOW() WHERE service_id = ?", [$coefBefore, $coefAfter, $serviceId]);
+    try {
+        if (($_POST['action'] ?? '') === 'update_default') {
+            $before = floatval($_POST['default_coefficient_before'] ?? 3);
+            $after = floatval($_POST['default_coefficient_after'] ?? 2);
+            $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_before', ?) ON DUPLICATE KEY UPDATE `value` = ?", [$before, $before]);
+            $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_after', ?) ON DUPLICATE KEY UPDATE `value` = ?", [$after, $after]);
+            $message = '默认系数已更新';
+        } elseif (($_POST['action'] ?? '') === 'update_service') {
+            $serviceId = intval($_POST['service_id'] ?? 0);
+            $coefBefore = ($_POST['coefficient_before'] ?? '') !== '' ? floatval($_POST['coefficient_before']) : null;
+            $coefAfter = ($_POST['coefficient_after'] ?? '') !== '' ? floatval($_POST['coefficient_after']) : null;
+
+            $existing = $db->query("SELECT id FROM service_coefficients WHERE service_id = ?", [$serviceId])->fetch();
+
+            if ($coefBefore === null && $coefAfter === null) {
+                if ($existing) {
+                    $db->query("DELETE FROM service_coefficients WHERE service_id = ?", [$serviceId]);
+                }
             } else {
-                $db->query("INSERT INTO service_coefficients (service_id, coefficient_before, coefficient_after) VALUES (?, ?, ?)", [$serviceId, $coefBefore, $coefAfter]);
+                if ($existing) {
+                    $db->query("UPDATE service_coefficients SET coefficient_before = ?, coefficient_after = ?, updated_at = NOW() WHERE service_id = ?", [$coefBefore, $coefAfter, $serviceId]);
+                } else {
+                    $db->query("INSERT INTO service_coefficients (service_id, coefficient_before, coefficient_after) VALUES (?, ?, ?)", [$serviceId, $coefBefore, $coefAfter]);
+                }
             }
+            $message = '服务系数已更新';
         }
-        $message = '服务系数已更新';
+    } catch (Throwable $e) {
+        $error = '保存失败：' . $e->getMessage();
+        error_log('[coefficients.php] ' . $e->getMessage());
+    }
+    // POST 结束后 PRG 重定向,避免 F5 重复提交
+    if ($message || $error) {
+        $_SESSION['flash_message'] = $message;
+        $_SESSION['flash_error'] = $error;
+        header('Location: index.php?page=coefficients');
+        exit;
     }
 }
 
 $defaultBefore = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'default_coefficient_before'")->fetchColumn() ?: '2');
 $defaultAfter = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'default_coefficient_after'")->fetchColumn() ?: '4');
+
+// 从 session 读取 flash
+if (!empty($_SESSION['flash_message'])) { $message = $_SESSION['flash_message']; unset($_SESSION['flash_message']); }
+if (!empty($_SESSION['flash_error'])) { $error = $_SESSION['flash_error']; unset($_SESSION['flash_error']); }
 
 $services = $db->query("
     SELECT s.id, s.name, s.code, sc.coefficient_before, sc.coefficient_after

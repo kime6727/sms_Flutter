@@ -23,8 +23,19 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'rese
         $newPassword = str_shuffle($newPassword);
         
         $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
-        $db->query("UPDATE users SET password_hash = ? WHERE id = ?", [$passwordHash, $userId]);
-        
+        try {
+            $db->query("UPDATE users SET password_hash = ? WHERE id = ?", [$passwordHash, $userId]);
+        } catch (Throwable $e) {
+            error_log('[users.php reset_password] ' . $e->getMessage());
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => '重置失败：' . $e->getMessage()]);
+                exit;
+            }
+            header("Location: ?page=users&error=" . urlencode("重置失败：" . $e->getMessage()));
+            exit;
+        }
+
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'password' => $newPassword]);
@@ -54,7 +65,18 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upda
             }
         }
         
-        $db->query("UPDATE users SET email = ? WHERE id = ?", [$email ?: null, $userId]);
+        try {
+            $db->query("UPDATE users SET email = ? WHERE id = ?", [$email ?: null, $userId]);
+        } catch (Throwable $e) {
+            error_log('[users.php update_email] ' . $e->getMessage());
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => '邮箱更新失败：' . $e->getMessage()]);
+                exit;
+            }
+            header("Location: ?page=users&error=" . urlencode("邮箱更新失败：" . $e->getMessage()));
+            exit;
+        }
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
@@ -71,7 +93,18 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upda
     $notes = $_POST['notes'] ?? null;
     
     if ($userId) {
-        $db->query("UPDATE users SET notes = ? WHERE id = ?", [$notes, $userId]);
+        try {
+            $db->query("UPDATE users SET notes = ? WHERE id = ?", [$notes, $userId]);
+        } catch (Throwable $e) {
+            error_log('[users.php update_notes] ' . $e->getMessage());
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => '备注更新失败：' . $e->getMessage()]);
+                exit;
+            }
+            header("Location: ?page=users&error=" . urlencode("备注更新失败：" . $e->getMessage()));
+            exit;
+        }
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
@@ -141,38 +174,49 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'crea
     
     $bonusMin = intval($db->query("SELECT value FROM system_settings WHERE `key` = ?", ['register_bonus_min'])->fetchColumn() ?: '5');
     $bonusMax = intval($db->query("SELECT value FROM system_settings WHERE `key` = ?", ['register_bonus_max'])->fetchColumn() ?: '20');
-    
+
     if ($bonusMin > $bonusMax) {
         $bonusMin = $bonusMax;
     }
-    
-    $bonusCredits = $bonusMin;
-    
-    $db->insert('users', [
-        'id' => $userId,
-        'device_id' => 'admin_' . bin2hex(random_bytes(8)),
-        'username' => $username,
-        'email' => $email,
-        'password_hash' => $passwordHash,
-        'balance' => $bonusCredits,
-        'total_spent' => 0,
-        'order_count' => 0,
-        'status' => 'active',
-        'role' => 'user',
-        'created_at' => date('Y-m-d H:i:s'),
-        'register_ip' => $_SERVER['REMOTE_ADDR'] ?? 'admin'
-    ]);
-    
-    if ($bonusCredits > 0) {
-        $db->insert('credit_transactions', [
-            'id' => 'txn_' . bin2hex(random_bytes(8)),
-            'user_id' => $userId,
-            'type' => 'bonus',
-            'amount' => $bonusCredits,
-            'balance_after' => $bonusCredits,
-            'description' => '运营后台创建用户赠送',
-            'created_at' => date('Y-m-d H:i:s')
+
+    $bonusCredits = $bonusMin === $bonusMax ? $bonusMin : rand($bonusMin, $bonusMax);
+
+    try {
+        $db->insert('users', [
+            'id' => $userId,
+            'device_id' => 'admin_' . bin2hex(random_bytes(8)),
+            'username' => $username,
+            'email' => $email,
+            'password_hash' => $passwordHash,
+            'balance' => $bonusCredits,
+            'total_spent' => 0,
+            'order_count' => 0,
+            'status' => 'active',
+            'role' => 'user',
+            'created_at' => date('Y-m-d H:i:s'),
+            'register_ip' => $_SERVER['REMOTE_ADDR'] ?? 'admin'
         ]);
+
+        if ($bonusCredits > 0) {
+            $db->insert('credit_transactions', [
+                'id' => 'txn_' . bin2hex(random_bytes(8)),
+                'user_id' => $userId,
+                'type' => 'bonus',
+                'amount' => $bonusCredits,
+                'balance_after' => $bonusCredits,
+                'description' => '运营后台创建用户赠送',
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+    } catch (Throwable $e) {
+        error_log('[users.php create_user] ' . $e->getMessage());
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => '创建失败：' . $e->getMessage()]);
+            exit;
+        }
+        header("Location: ?page=users&error=" . urlencode("创建失败：" . $e->getMessage()));
+        exit;
     }
     
     if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
@@ -189,7 +233,43 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_
     $userId = $_POST['user_id'] ?? null;
     $amount = intval($_POST['amount'] ?? 0);
     if ($userId && $amount != 0) {
-        $db->query("UPDATE users SET balance = balance + ? WHERE id = ?", [$amount, $userId]);
+        try {
+            // 先查当前余额,用于流水记录
+            $currentUser = $db->query("SELECT balance FROM users WHERE id = ?", [$userId])->fetch();
+            if (!$currentUser) {
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => '用户不存在']);
+                    exit;
+                }
+                header("Location: ?page=users&error=" . urlencode("用户不存在"));
+                exit;
+            }
+            $balanceBefore = intval($currentUser['balance']);
+            $balanceAfter = $balanceBefore + $amount;
+
+            $db->query("UPDATE users SET balance = balance + ? WHERE id = ?", [$amount, $userId]);
+
+            // 记录积分流水(运营后台手动调整)
+            $db->insert('credit_transactions', [
+                'id' => 'txn_' . bin2hex(random_bytes(8)),
+                'user_id' => $userId,
+                'type' => $amount > 0 ? 'bonus' : 'refund',
+                'amount' => $amount,
+                'balance_after' => $balanceAfter,
+                'description' => '运营后台手动调整: ' . ($amount > 0 ? '+' : '') . $amount,
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+        } catch (Throwable $e) {
+            error_log('[users.php add_balance] ' . $e->getMessage());
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => '积分更新失败：' . $e->getMessage()]);
+                exit;
+            }
+            header("Location: ?page=users&error=" . urlencode("积分更新失败：" . $e->getMessage()));
+            exit;
+        }
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
@@ -207,7 +287,18 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'togg
         $user = $db->query("SELECT status FROM users WHERE id = ?", [$userId])->fetch();
         if ($user) {
             $newStatus = $user['status'] === 'active' ? 'banned' : 'active';
-            $db->query("UPDATE users SET status = ? WHERE id = ?", [$newStatus, $userId]);
+            try {
+                $db->query("UPDATE users SET status = ? WHERE id = ?", [$newStatus, $userId]);
+            } catch (Throwable $e) {
+                error_log('[users.php toggle_status] ' . $e->getMessage());
+                if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'error' => '操作失败：' . $e->getMessage()]);
+                    exit;
+                }
+                header("Location: ?page=users&error=" . urlencode("操作失败：" . $e->getMessage()));
+                exit;
+            }
             $msg = $newStatus === 'active' ? '用户已解封' : '用户已封禁';
             if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
                 header('Content-Type: application/json');
@@ -234,9 +325,20 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dele
             header("Location: ?page=users&error=" . urlencode("不能删除管理员账号"));
             exit;
         }
-        
-        $db->query("DELETE FROM users WHERE id = ?", [$userId]);
-        
+
+        try {
+            $db->query("DELETE FROM users WHERE id = ?", [$userId]);
+        } catch (Throwable $e) {
+            error_log('[users.php delete_user] ' . $e->getMessage());
+            if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => '删除失败：' . $e->getMessage()]);
+                exit;
+            }
+            header("Location: ?page=users&error=" . urlencode("删除失败：" . $e->getMessage()));
+            exit;
+        }
+
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])) {
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
@@ -270,9 +372,14 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'batc
             $skippedCount++;
             continue;
         }
-        
-        $db->query("DELETE FROM users WHERE id = ?", [$userId]);
-        $deletedCount++;
+
+        try {
+            $db->query("DELETE FROM users WHERE id = ?", [$userId]);
+            $deletedCount++;
+        } catch (Throwable $e) {
+            error_log('[users.php batch_delete] ' . $e->getMessage() . " user_id={$userId}");
+            $skippedCount++;
+        }
     }
     
     $message = "成功删除 {$deletedCount} 个用户";

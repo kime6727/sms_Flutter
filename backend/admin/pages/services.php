@@ -180,43 +180,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['ajax'])) {
 
     switch ($action) {
         case 'batch_publish':
-            $db->query("UPDATE services SET is_published = 1 WHERE id IN ($idList)");
-            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已上架']);
-            break;
+            try {
+                $db->query("UPDATE services SET is_published = 1 WHERE id IN ($idList)");
+                echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已上架']);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '上架失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'batch_unpublish':
-            $db->query("UPDATE services SET is_published = 0 WHERE id IN ($idList)");
-            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已下架']);
-            break;
+            try {
+                $db->query("UPDATE services SET is_published = 0 WHERE id IN ($idList)");
+                echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已下架']);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '下架失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'batch_pin':
-            $db->query("UPDATE services SET is_pinned = 1 WHERE id IN ($idList)");
-            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已置顶']);
-            break;
+            try {
+                $db->query("UPDATE services SET is_pinned = 1 WHERE id IN ($idList)");
+                echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已置顶']);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '置顶失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'batch_unpin':
-            $db->query("UPDATE services SET is_pinned = 0 WHERE id IN ($idList)");
-            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已取消置顶']);
-            break;
+            try {
+                $db->query("UPDATE services SET is_pinned = 0 WHERE id IN ($idList)");
+                echo json_encode(['success' => true, 'count' => count($ids), 'msg' => '已取消置顶']);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '取消置顶失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'batch_set_tag':
             $tag = intval($_POST['tag'] ?? 0);
-            $db->query("UPDATE services SET tag = ? WHERE id IN ($idList)", [$tag]);
-            echo json_encode(['success' => true, 'count' => count($ids), 'msg' => "已设标签={$tag}"]);
-            break;
+            try {
+                $db->query("UPDATE services SET tag = ? WHERE id IN ($idList)", [$tag]);
+                echo json_encode(['success' => true, 'count' => count($ids), 'msg' => "已设标签={$tag}"]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '标签设置失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'batch_set_coefficient':
             $coef = floatval($_POST['coefficient'] ?? 0);
-            // 这里用 system_settings 全局配置
-            $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_after'", [(string)$coef]);
-            echo json_encode(['success' => true, 'msg' => "全局系数已设为 {$coef}"]);
-            break;
+            try {
+                $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_after'", [(string)$coef]);
+                echo json_encode(['success' => true, 'msg' => "全局系数已设为 {$coef}"]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '系数更新失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'toggle_publish':
             $id = intval($_POST['id']);
-            $cur = $db->query("SELECT is_published FROM services WHERE id = ?", [$id])->fetch();
-            if ($cur) {
-                $new = $cur['is_published'] ? 0 : 1;
-                $db->query("UPDATE services SET is_published = ? WHERE id = ?", [$new, $id]);
-                echo json_encode(['success' => true, 'is_published' => $new]);
-            } else {
-                echo json_encode(['success' => false, 'error' => '服务不存在']);
+            try {
+                $cur = $db->query("SELECT is_published FROM services WHERE id = ?", [$id])->fetch();
+                if ($cur) {
+                    $new = $cur['is_published'] ? 0 : 1;
+                    $db->query("UPDATE services SET is_published = ? WHERE id = ?", [$new, $id]);
+                    echo json_encode(['success' => true, 'is_published' => $new]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => '服务不存在']);
+                }
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '操作失败：' . $e->getMessage()]);
             }
-            break;
+            exit;
         case 'update_service':
             $id = intval($_POST['id']);
             $name_cn = $_POST['name_cn'] ?? '';
@@ -224,18 +251,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['ajax'])) {
             $sort_order = intval($_POST['sort_order'] ?? 0);
             $is_pinned = intval($_POST['is_pinned'] ?? 0);
             $tag = intval($_POST['tag'] ?? 0);
-            $db->query(
-                "UPDATE services SET name_cn = ?, name_en = ?, sort_order = ?, is_pinned = ?, tag = ? WHERE id = ?",
-                [$name_cn, $name_en, $sort_order, $is_pinned, $tag, $id]
-            );
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query(
+                    "UPDATE services SET name_cn = ?, name_en = ?, sort_order = ?, is_pinned = ?, tag = ? WHERE id = ?",
+                    [$name_cn, $name_en, $sort_order, $is_pinned, $tag, $id]
+                );
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '更新失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'delete_service':
             $id = intval($_POST['id']);
-            $db->query("DELETE FROM service_countries WHERE service_id = ?", [$id]);
-            $db->query("DELETE FROM services WHERE id = ?", [$id]);
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query("DELETE FROM service_countries WHERE service_id = ?", [$id]);
+                $db->query("DELETE FROM services WHERE id = ?", [$id]);
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '删除失败：' . $e->getMessage()]);
+            }
+            exit;
         default:
             echo json_encode(['success' => false, 'error' => '未知操作: ' . $action]);
     }

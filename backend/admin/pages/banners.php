@@ -247,10 +247,11 @@ document.querySelectorAll('.toggle-form').forEach(function(form) {
         e.preventDefault();
         var formData = new FormData(form);
         var button = form.querySelector('.toggle-btn');
-        
+
         fetch('', {
             method: 'POST',
-            body: formData
+            body: formData,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
         })
         .then(function(response) { return response.json(); })
         .then(function(response) {
@@ -264,7 +265,13 @@ document.querySelectorAll('.toggle-form').forEach(function(form) {
                     button.style.color = '#6b7280';
                     button.textContent = '禁用';
                 }
+            } else {
+                alert('操作失败：' + (response.error || '未知错误'));
+                window.location.reload();
             }
+        }).catch(function(err) {
+            alert('请求失败：' + err.message);
+            window.location.reload();
         });
     });
 });

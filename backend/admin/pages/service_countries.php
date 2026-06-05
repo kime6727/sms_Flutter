@@ -95,53 +95,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['ajax'])) {
 
     switch ($action) {
         case 'batch_publish':
-            $db->query("UPDATE service_countries SET is_published = 1 WHERE service_id = ? AND id IN ($idList)", [$sid]);
-            echo json_encode(['success' => true, 'count' => count($ids)]);
-            break;
+            try {
+                $db->query("UPDATE service_countries SET is_published = 1 WHERE service_id = ? AND id IN ($idList)", [$sid]);
+                echo json_encode(['success' => true, 'count' => count($ids)]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '上架失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'batch_unpublish':
-            $db->query("UPDATE service_countries SET is_published = 0 WHERE service_id = ? AND id IN ($idList)", [$sid]);
-            echo json_encode(['success' => true, 'count' => count($ids)]);
-            break;
+            try {
+                $db->query("UPDATE service_countries SET is_published = 0 WHERE service_id = ? AND id IN ($idList)", [$sid]);
+                echo json_encode(['success' => true, 'count' => count($ids)]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '下架失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'toggle_sc':
             $id = intval($_POST['id']);
-            $cur = $db->query("SELECT is_published FROM service_countries WHERE id = ?", [$id])->fetch();
-            if ($cur) {
-                $new = $cur['is_published'] ? 0 : 1;
-                $db->query("UPDATE service_countries SET is_published = ? WHERE id = ?", [$new, $id]);
-                echo json_encode(['success' => true, 'is_published' => $new]);
-            } else {
-                echo json_encode(['success' => false]);
+            try {
+                $cur = $db->query("SELECT is_published FROM service_countries WHERE id = ?", [$id])->fetch();
+                if ($cur) {
+                    $new = $cur['is_published'] ? 0 : 1;
+                    $db->query("UPDATE service_countries SET is_published = ? WHERE id = ?", [$new, $id]);
+                    echo json_encode(['success' => true, 'is_published' => $new]);
+                } else {
+                    echo json_encode(['success' => false, 'error' => '记录不存在']);
+                }
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '操作失败：' . $e->getMessage()]);
             }
-            break;
+            exit;
         case 'update_sc':
             $id = intval($_POST['id']);
             $customPrice = $_POST['custom_price'] !== '' ? floatval($_POST['custom_price']) : null;
             $coefficient = floatval($_POST['coefficient'] ?? 1);
             $is_published = intval($_POST['is_published'] ?? 1);
-            $db->query(
-                "UPDATE service_countries SET custom_price = ?, coefficient = ?, is_published = ? WHERE id = ?",
-                [$customPrice, $coefficient, $is_published, $id]
-            );
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query(
+                    "UPDATE service_countries SET custom_price = ?, coefficient = ?, is_published = ? WHERE id = ?",
+                    [$customPrice, $coefficient, $is_published, $id]
+                );
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '更新失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'add_country':
             $cid = intval($_POST['country_id']);
-            $db->query("INSERT IGNORE INTO service_countries (service_id, country_id, price, is_published, is_active, created_at, updated_at) VALUES (?, ?, 0, 1, 1, NOW(), NOW())", [$sid, $cid]);
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query("INSERT IGNORE INTO service_countries (service_id, country_id, price, is_published, is_active, created_at, updated_at) VALUES (?, ?, 0, 1, 1, NOW(), NOW())", [$sid, $cid]);
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '添加失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'remove_sc':
             $id = intval($_POST['id']);
-            $db->query("DELETE FROM service_countries WHERE id = ?", [$id]);
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query("DELETE FROM service_countries WHERE id = ?", [$id]);
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '删除失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'publish_all':
-            $db->query("UPDATE service_countries SET is_published = 1 WHERE service_id = ?", [$sid]);
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query("UPDATE service_countries SET is_published = 1 WHERE service_id = ?", [$sid]);
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '全部上架失败：' . $e->getMessage()]);
+            }
+            exit;
         case 'unpublish_all':
-            $db->query("UPDATE service_countries SET is_published = 0 WHERE service_id = ?", [$sid]);
-            echo json_encode(['success' => true]);
-            break;
+            try {
+                $db->query("UPDATE service_countries SET is_published = 0 WHERE service_id = ?", [$sid]);
+                echo json_encode(['success' => true]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => '全部下架失败：' . $e->getMessage()]);
+            }
+            exit;
         default:
             echo json_encode(['success' => false, 'error' => '未知操作']);
     }
