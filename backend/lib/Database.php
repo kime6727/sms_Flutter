@@ -153,13 +153,18 @@ class Database {
                 $data['id'] = $uuid;
             }
         }
-        
+
         $columns = array_map(fn($col) => "`$col`", array_keys($data));
         $placeholders = array_fill(0, count($data), '?');
-        
+
         $sql = "INSERT INTO $table (" . implode(',', $columns) . ") VALUES (" . implode(',', $placeholders) . ")";
-        
+
         $this->query($sql, array_values($data));
+
+        // 对于 UUID 主键的表, lastInsertId 永远返回 0, 应该返回 $data['id']
+        if (isset($data['id']) && is_string($data['id']) && strlen($data['id']) > 10) {
+            return $data['id'];
+        }
         return $this->pdo->lastInsertId();
     }
     

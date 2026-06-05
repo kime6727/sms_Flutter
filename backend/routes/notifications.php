@@ -35,6 +35,21 @@ if ($path === '/notifications' && $method === 'GET') {
     exit;
 }
 
+// 通知未读数量
+if ($path === '/notifications/unread-count' && $method === 'GET') {
+    $userId = getSecureUserId();
+    if (!$userId) {
+        apiBadRequest('user_id 参数缺失');
+    }
+    // status 字段: 'unread' / 'read'
+    $count = $db->query(
+        "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND (status = 'unread' OR status IS NULL OR status = '')",
+        [$userId]
+    )->fetchColumn();
+    echo json_encode(['success' => true, 'data' => ['unread' => intval($count)]]);
+    exit;
+}
+
 // 标记通知为已读
 if (preg_match('/^\/notifications\/(.+)\/read$/', $path, $matches) && $method === 'POST') {
     $notificationId = $matches[1];
