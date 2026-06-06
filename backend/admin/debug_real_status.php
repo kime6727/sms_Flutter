@@ -18,13 +18,13 @@ $out = ['success' => true];
 try {
     $cols = $db->query("SHOW COLUMNS FROM countries")->fetchAll();
     $out['countries_schema'] = array_map(fn($r) => ['field' => $r['Field'], 'type' => $r['Type'], 'null' => $r['Null'], 'key' => $r['Key'], 'default' => $r['Default']], $cols);
-    $out['countries_data'] = $db->query("SELECT id, name, iso, published FROM countries ORDER BY id LIMIT 10")->fetchAll();
+    $out['countries_data'] = $db->query("SELECT id, name, hero_country_id, code, active, sort_order FROM countries ORDER BY id LIMIT 10")->fetchAll();
     $out['countries_count'] = $db->query("SELECT COUNT(*) FROM countries")->fetchColumn();
 } catch (Throwable $e) { $out['countries_error'] = $e->getMessage(); }
 
 // 2. users
 try {
-    $out['users_data'] = $db->query("SELECT id, email, username, status, banned FROM users ORDER BY created_at DESC LIMIT 10")->fetchAll();
+    $out['users_data'] = $db->query("SELECT id, email, username, status FROM users ORDER BY id LIMIT 10")->fetchAll();
     $out['users_count'] = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
 } catch (Throwable $e) { $out['users_error'] = $e->getMessage(); }
 
