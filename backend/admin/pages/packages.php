@@ -78,8 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $isRecommended = isset($_POST['is_recommended']) ? 1 : 0;
         $active = isset($_POST['active']) ? 1 : 0;
 
-        if (!$productId || !$configName || $credits <= 0) {
-            $error = '请填写必填字段（产品ID、商品名称、积分）';
+        // product_id 是必填 (UI 不显示, 但 admin 提交要有,否则自动生成)
+        if (!$productId) {
+            $productId = 'simu_' . time() . '_' . substr(md5(uniqid()), 0, 6);
+        }
+        if (!$configName || $credits <= 0) {
+            $error = '请填写必填字段（商品名称、积分）';
         } else {
             try {
                 $exists = $db->query("SELECT id FROM payment_configs WHERE product_id = ?", [$productId])->fetch();
@@ -90,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "INSERT INTO payment_configs (product_id, name, config_name, price, credits, display_price, description, is_recommended, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         [$productId, $configName, $configName, $price, $credits, $displayPrice, $description, $isRecommended, $active, date('Y-m-d H:i:s')]
                     );
-                    $message = '套餐已创建';
+                    $message = '套餐已创建：' . $configName;
                 }
             } catch (Throwable $e) {
                 $error = '创建失败：' . $e->getMessage();

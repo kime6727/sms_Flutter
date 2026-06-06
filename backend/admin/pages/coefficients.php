@@ -7,8 +7,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (($_POST['action'] ?? '') === 'update_default') {
             $before = floatval($_POST['default_coefficient_before'] ?? 3);
             $after = floatval($_POST['default_coefficient_after'] ?? 2);
-            $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_before', ?) ON DUPLICATE KEY UPDATE `value` = ?", [$before, $before]);
-            $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_after', ?) ON DUPLICATE KEY UPDATE `value` = ?", [$after, $after]);
+
+            // 先查后改, 不用 ON DUPLICATE KEY (因为 system_settings.key 无 UNIQUE 索引)
+            $existsBefore = $db->query("SELECT id FROM system_settings WHERE `key` = 'default_coefficient_before'")->fetch();
+            if ($existsBefore) {
+                $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_before'", [$before]);
+            } else {
+                $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_before', ?)", [$before]);
+            }
+            $existsAfter = $db->query("SELECT id FROM system_settings WHERE `key` = 'default_coefficient_after'")->fetch();
+            if ($existsAfter) {
+                $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_after'", [$after]);
+            } else {
+                $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_after', ?)", [$after]);
+            }
             $message = '默认系数已更新';
         } elseif (($_POST['action'] ?? '') === 'update_service') {
             $serviceId = intval($_POST['service_id'] ?? 0);
