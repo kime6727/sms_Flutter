@@ -159,8 +159,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($message || $error)) {
     $_SESSION['flash_message'] = $message;
     $_SESSION['flash_error'] = $error;
-    // [DEBUG] 写到 file 看实际值
-    file_put_contents('/tmp/packages_debug.log', date('c') . " POST action=" . ($_POST['action'] ?? '?') . " message=" . var_export($message, true) . " error=" . var_export($error, true) . "\n", FILE_APPEND);
     header('Location: index.php?page=packages');
     exit;
 }

@@ -525,21 +525,54 @@ if ($path === '/devices/register' && $method === 'POST') {
     $userId = $input['user_id'] ?? null;
     $deviceType = $input['device_type'] ?? 'ios';
     $pushToken = $input['push_token'] ?? null;
-    
+
     if (!$userId) {
         $userId = getCurrentUserIdFromToken();
     }
-    
-    if (!$deviceId || !$userId) {
-        apiBadRequest('参数缺失');
+
+    if (!$userId) {
+        apiBadRequest('user_id 参数缺失');
     }
-    
-    $db->query(
-        "INSERT INTO devices (user_id, device_id, device_type, push_token, last_active) VALUES (?, ?, ?, ?, NOW()) 
-         ON DUPLICATE KEY UPDATE push_token = VALUES(push_token), last_active = NOW()",
-        [$userId, $deviceId, $deviceType, $pushToken]
+
+    // devices 表只有 device_token，没有 device_id 和 push_token
+    // 把 device_id/push_token 都映射到 device_token（push_token 优先，兜底用 device_id）
+    $token = $pushToken ?: $deviceId;
+    if (!$token) {
+        apiBadRequest('device_id 或 push_token 至少需要一个');
+    }
+
+    // 设备的 id 字段是 varchar(36) 主键，需要 UUID
+    $deviceRowId = sprintf(
+        '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+        mt_rand(0, 0xffff),
+        mt_rand(0, 0x0fff) | 0x4000,
+        mt_rand(0, 0x3fff) | 0x8000,
+        mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
     );
-    
+
+    try {
+        // 用 device_token 做去重（同 token 重复注册更新 last_active）
+        $existing = $db->query(
+            "SELECT id FROM devices WHERE user_id = ? AND device_token = ? LIMIT 1",
+            [$userId, $token]
+        )->fetch();
+
+        if ($existing) {
+            $db->query(
+                "UPDATE devices SET device_type = ?, updated_at = NOW() WHERE id = ?",
+                [$deviceType, $existing['id']]
+            );
+        } else {
+            $db->query(
+                "INSERT INTO devices (id, user_id, device_token, device_type, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())",
+                [$deviceRowId, $userId, $token, $deviceType]
+            );
+        }
+    } catch (Exception $e) {
+        apiError('设备注册失败: ' . $e->getMessage(), 500, 'device_register_failed');
+    }
+
     echo json_encode(['success' => true, 'message' => '设备注册成功']);
     exit;
 }
@@ -658,57 +691,38 @@ if ($path === '/services/price/calculated' && $method === 'GET') {
     $serviceId = $_GET['service_id'] ?? null;
     $countryId = $_GET['country_id'] ?? null;
     $userId = $_GET['user_id'] ?? null;
-    
+
     if (!$userId) {
         $userId = getCurrentUserIdFromToken();
     }
-    
+
     if (!$serviceId || !$countryId) {
         apiBadRequest('参数缺失');
     }
-    
+
+    // 安全修复：services/countries 表没有 price_coefficient 字段，移除该引用
     $serviceCountry = $db->query(
-        "SELECT sc.*, s.price_coefficient as service_coefficient, c.price_coefficient as country_coefficient
+        "SELECT sc.id, sc.service_id, sc.country_id, sc.price
          FROM service_countries sc
-         LEFT JOIN services s ON sc.service_id = s.id
-         LEFT JOIN countries c ON sc.country_id = c.id
          WHERE sc.service_id = ? AND sc.country_id = ? AND sc.is_published = 1 AND sc.is_active = 1",
         [$serviceId, $countryId]
     )->fetch();
-    
+
     if (!$serviceCountry) {
         apiNotFound('服务国家组合不存在');
     }
-    
-    $basePrice = floatval($serviceCountry['price']); // service_countries 没有 base_price 字段，用 price
-    $serviceCoefficient = floatval($serviceCountry['service_coefficient'] ?? 1.0);
-    $countryCoefficient = floatval($serviceCountry['country_coefficient'] ?? 1.0);
-    
-    $finalPrice = $basePrice * $serviceCoefficient * $countryCoefficient;
-    
-    if ($userId) {
-        $user = $db->query("SELECT total_spent FROM users WHERE id = ?", [$userId])->fetch();
-        if ($user) {
-            $totalSpent = floatval($user['total_spent']);
-            $membership = $db->query(
-                "SELECT discount FROM membership_levels WHERE min_spent <= ? AND active = 1 ORDER BY min_spent DESC LIMIT 1",
-                [$totalSpent]
-            )->fetch();
-            
-            if ($membership) {
-                $discount = floatval($membership['discount']);
-                $finalPrice = $finalPrice * (1 - $discount / 100);
-            }
-        }
-    }
-    
+
+    // 使用统一的价格计算函数（应用系统系数 + 会员折扣）
+    $finalPrice = calculateServicePricePoints($db, $serviceId, $countryId, $userId);
+    $basePrice = floatval($serviceCountry['price']);
+
     echo json_encode([
         'success' => true,
         'data' => [
             'base_price' => $basePrice,
-            'service_coefficient' => $serviceCoefficient,
-            'country_coefficient' => $countryCoefficient,
-            'final_price' => intval(ceil($finalPrice))
+            'service_coefficient' => null,
+            'country_coefficient' => null,
+            'final_price' => $finalPrice
         ]
     ]);
     exit;
