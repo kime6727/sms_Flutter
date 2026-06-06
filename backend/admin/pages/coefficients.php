@@ -42,6 +42,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $coefBefore = ($_POST['coefficient_before'] ?? '') !== '' ? floatval($_POST['coefficient_before']) : null;
             $coefAfter = ($_POST['coefficient_after'] ?? '') !== '' ? floatval($_POST['coefficient_after']) : null;
 
+            // 自愈: service_coefficients.name NOT NULL default '' (避免 INSERT 缺 name)
+            static $scNameFixed = false;
+            if (!$scNameFixed) {
+                try {
+                    $nameInfo = $db->query("SHOW COLUMNS FROM service_coefficients WHERE Field = 'name'")->fetch();
+                    if ($nameInfo && $nameInfo['Null'] === 'NO' && ($nameInfo['Default'] === null || $nameInfo['Default'] === 'NULL' || $nameInfo['Default'] === '')) {
+                        $db->query("ALTER TABLE service_coefficients MODIFY COLUMN name VARCHAR(100) NOT NULL DEFAULT ''");
+                        error_log('[coefficients.php] Fixed service_coefficients.name DEFAULT');
+                    }
+                    $scNameFixed = true;
+                } catch (Throwable $e) {
+                    error_log('[coefficients.php] sc name fix failed: ' . $e->getMessage());
+                }
+            }
+
             $existing = $db->query("SELECT id FROM service_coefficients WHERE service_id = ?", [$serviceId])->fetch();
 
             if ($coefBefore === null && $coefAfter === null) {
