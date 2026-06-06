@@ -8,6 +8,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $before = floatval($_POST['default_coefficient_before'] ?? 3);
             $after = floatval($_POST['default_coefficient_after'] ?? 2);
 
+            // 自愈: 给 system_settings.key 加 UNIQUE 索引 (没有它 ON DUPLICATE KEY 永远不触发)
+            static $keyIndexFixed = false;
+            if (!$keyIndexFixed) {
+                try {
+                    $idx = $db->query("SHOW INDEX FROM system_settings WHERE Key_name = 'uk_settings_key'")->fetch();
+                    if (!$idx) {
+                        $db->query("ALTER TABLE system_settings ADD UNIQUE KEY uk_settings_key (`key`)");
+                        error_log('[coefficients.php] Added UNIQUE key on system_settings.key');
+                    }
+                    $keyIndexFixed = true;
+                } catch (Throwable $e) {
+                    error_log('[coefficients.php] index fix failed: ' . $e->getMessage());
+                }
+            }
+
             // 先查后改, 不用 ON DUPLICATE KEY (因为 system_settings.key 无 UNIQUE 索引)
             $existsBefore = $db->query("SELECT id FROM system_settings WHERE `key` = 'default_coefficient_before'")->fetch();
             if ($existsBefore) {
