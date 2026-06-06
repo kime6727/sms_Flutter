@@ -45,6 +45,19 @@ try {
     $out['payment_configs_schema'] = array_map(fn($r) => ['field' => $r['Field'], 'type' => $r['Type'], 'null' => $r['Null'], 'default' => $r['Default']], $cols);
     $out['payment_configs_data'] = $db->query("SELECT * FROM payment_configs LIMIT 5")->fetchAll();
     $out['payment_configs_count'] = $db->query("SELECT COUNT(*) FROM payment_configs")->fetchColumn();
+
+    // 自愈: payment_configs.id 加 AUTO_INCREMENT
+    $idInfo = $db->query("SHOW COLUMNS FROM payment_configs WHERE Field = 'id'")->fetch();
+    if ($idInfo && stripos($idInfo['Extra'] ?? '', 'auto_increment') === false) {
+        try {
+            $db->query("ALTER TABLE payment_configs MODIFY COLUMN id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY");
+            $out['payment_configs_id_fixed'] = 'YES - AUTO_INCREMENT added';
+        } catch (Throwable $e) {
+            $out['payment_configs_id_fixed'] = 'NO: ' . $e->getMessage();
+        }
+    } else {
+        $out['payment_configs_id_fixed'] = 'already has auto_increment';
+    }
 } catch (Throwable $e) { $out['payment_configs_error'] = $e->getMessage(); }
 
 // 5. services
