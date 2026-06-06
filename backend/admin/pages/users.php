@@ -256,6 +256,7 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_
                 'user_id' => $userId,
                 'type' => $amount > 0 ? 'bonus' : 'refund',
                 'amount' => $amount,
+                'balance_before' => $balanceBefore,
                 'balance_after' => $balanceAfter,
                 'description' => '运营后台手动调整: ' . ($amount > 0 ? '+' : '') . $amount,
                 'created_at' => date('Y-m-d H:i:s')
