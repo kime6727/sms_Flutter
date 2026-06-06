@@ -58,13 +58,13 @@ if ($needFix) {
             }
         }
 
-        // 关键: id 字段必须是 AUTO_INCREMENT PRIMARY KEY
-        // 之前 schema 是 id int default 0, 导致每次 INSERT 显式写 id=0 (与已有 id=0 冲突)
+        // 关键: id 字段必须是 AUTO_INCREMENT (没有它, INSERT 显式 id=0 与已有 id=0 冲突)
         $idInfo = $db->query("SHOW COLUMNS FROM payment_configs WHERE Field = 'id'")->fetch();
         if ($idInfo && stripos($idInfo['Extra'] ?? '', 'auto_increment') === false) {
             try {
-                $db->query("ALTER TABLE `payment_configs` MODIFY COLUMN `id` INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY");
-                error_log("[packages.php schema fix] MODIFY id AUTO_INCREMENT PRIMARY KEY");
+                // id 已经是 PRIMARY KEY, 不能再加 PRIMARY KEY
+                $db->query("ALTER TABLE `payment_configs` MODIFY COLUMN `id` INT(11) NOT NULL AUTO_INCREMENT");
+                error_log("[packages.php schema fix] MODIFY id AUTO_INCREMENT");
             } catch (Throwable $e3) {
                 error_log("[packages.php schema fix] MODIFY id AUTO_INCREMENT failed: " . $e3->getMessage());
             }

@@ -50,7 +50,8 @@ try {
     $idInfo = $db->query("SHOW COLUMNS FROM payment_configs WHERE Field = 'id'")->fetch();
     if ($idInfo && stripos($idInfo['Extra'] ?? '', 'auto_increment') === false) {
         try {
-            $db->query("ALTER TABLE payment_configs MODIFY COLUMN id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY");
+            // 不带 PRIMARY KEY (已经有)
+            $db->query("ALTER TABLE payment_configs MODIFY COLUMN id INT(11) NOT NULL AUTO_INCREMENT");
             $out['payment_configs_id_fixed'] = 'YES - AUTO_INCREMENT added';
         } catch (Throwable $e) {
             $out['payment_configs_id_fixed'] = 'NO: ' . $e->getMessage();
