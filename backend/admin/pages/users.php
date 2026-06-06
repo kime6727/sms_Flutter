@@ -3,6 +3,29 @@
  * 用户管理页面
  */
 
+// 自愈: credit_transactions.balance_before / balance_after NOT NULL default 0.00
+// (避免 INSERT 缺 balance_before/after 报 1364 错)
+static $creditTxSchemaFixed = false;
+if (!$creditTxSchemaFixed) {
+    try {
+        if (!isset($db)) {
+            require_once __DIR__ . '/../../config/database.php';
+            require_once __DIR__ . '/../../lib/Database.php';
+            $db = new Database(DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT);
+        }
+        foreach (['balance_before', 'balance_after'] as $f) {
+            $col = $db->query("SHOW COLUMNS FROM credit_transactions WHERE Field = ?", [$f])->fetch();
+            if ($col && $col['Null'] === 'NO' && ($col['Default'] === null || $col['Default'] === 'NULL' || $col['Default'] === '')) {
+                $db->query("ALTER TABLE credit_transactions MODIFY COLUMN $f DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+                error_log("[users.php schema fix] credit_transactions.$f DEFAULT 0.00");
+            }
+        }
+        $creditTxSchemaFixed = true;
+    } catch (Throwable $e) {
+        error_log('[users.php schema fix] failed: ' . $e->getMessage());
+    }
+}
+
 // 处理重置密码操作
 if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reset_password') || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && ($_POST['action'] ?? '') === 'reset_password')) {
     $userId = $_POST['user_id'] ?? null;
@@ -203,6 +226,7 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'crea
                 'user_id' => $userId,
                 'type' => 'bonus',
                 'amount' => $bonusCredits,
+                'balance_before' => 0,
                 'balance_after' => $bonusCredits,
                 'description' => '运营后台创建用户赠送',
                 'created_at' => date('Y-m-d H:i:s')
