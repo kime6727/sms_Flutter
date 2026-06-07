@@ -5,8 +5,9 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (($_POST['action'] ?? '') === 'update_default') {
-            $before = floatval($_POST['default_coefficient_before'] ?? 3);
-            $after = floatval($_POST['default_coefficient_after'] ?? 2);
+            $before = floatval($_POST['default_coefficient_before'] ?? 4);
+            $after = floatval($_POST['default_coefficient_after'] ?? 4.5);
+            $cheapThresholdUsd = floatval($_POST['cheap_threshold_usd'] ?? 0.05);
 
             // 自愈: 给 system_settings.key 加 UNIQUE 索引 (没有它 ON DUPLICATE KEY 永远不触发)
             static $keyIndexFixed = false;
@@ -23,20 +24,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // 先查后改, 不用 ON DUPLICATE KEY (因为 system_settings.key 无 UNIQUE 索引)
-            $existsBefore = $db->query("SELECT id FROM system_settings WHERE `key` = 'default_coefficient_before'")->fetch();
-            if ($existsBefore) {
-                $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_before'", [$before]);
-            } else {
-                $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_before', ?)", [$before]);
-            }
-            $existsAfter = $db->query("SELECT id FROM system_settings WHERE `key` = 'default_coefficient_after'")->fetch();
-            if ($existsAfter) {
-                $db->query("UPDATE system_settings SET value = ? WHERE `key` = 'default_coefficient_after'", [$after]);
-            } else {
-                $db->query("INSERT INTO system_settings (`key`, `value`) VALUES ('default_coefficient_after', ?)", [$after]);
-            }
-            $message = '默认系数已更新';
+            // 工具函数: 单条 key 写入
+            $upsertSetting = function(string $key, $value) use ($db) {
+                $exists = $db->query("SELECT id FROM system_settings WHERE `key` = ?", [$key])->fetch();
+                if ($exists) {
+                    $db->query("UPDATE system_settings SET value = ? WHERE `key` = ?", [(string)$value, $key]);
+                } else {
+                    $db->query("INSERT INTO system_settings (`key`, `value`) VALUES (?, ?)", [$key, (string)$value]);
+                }
+            };
+
+            $upsertSetting('default_coefficient_before', $before);
+            $upsertSetting('default_coefficient_after', $after);
+            $upsertSetting('cheap_threshold_usd', $cheapThresholdUsd);
+            $message = '默认系数 + 便宜服务阈值已更新';
         } elseif (($_POST['action'] ?? '') === 'update_service') {
             $serviceId = intval($_POST['service_id'] ?? 0);
             $coefBefore = ($_POST['coefficient_before'] ?? '') !== '' ? floatval($_POST['coefficient_before']) : null;
@@ -85,8 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$defaultBefore = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'default_coefficient_before'")->fetchColumn() ?: '2');
-$defaultAfter = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'default_coefficient_after'")->fetchColumn() ?: '4');
+$defaultBefore = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'default_coefficient_before'")->fetchColumn() ?: '4');
+$defaultAfter = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'default_coefficient_after'")->fetchColumn() ?: '4.5');
+$cheapThresholdUsd = floatval($db->query("SELECT value FROM system_settings WHERE `key` = 'cheap_threshold_usd'")->fetchColumn() ?: '0.05');
 
 // 从 session 读取 flash
 if (!empty($_SESSION['flash_message'])) { $message = $_SESSION['flash_message']; unset($_SESSION['flash_message']); }
@@ -129,15 +131,22 @@ $services = $db->query("
             <input type="hidden" name="action" value="update_default">
             <div>
                 <label style="display: block; font-size: 13px; color: #64748b; margin-bottom: 6px;">充值前系数（用户未充值时使用，价格较低）</label>
-                <input type="number" name="default_coefficient_before" value="<?= $defaultBefore ?>" 
+                <input type="number" name="default_coefficient_before" value="<?= $defaultBefore ?>"
                        step="0.1" min="0.1" max="100" required
                        style="padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; width: 120px; font-size: 16px;">
             </div>
             <div>
                 <label style="display: block; font-size: 13px; color: #64748b; margin-bottom: 6px;">充值后系数（用户充值后使用，价格较高）</label>
-                <input type="number" name="default_coefficient_after" value="<?= $defaultAfter ?>" 
+                <input type="number" name="default_coefficient_after" value="<?= $defaultAfter ?>"
                        step="0.1" min="0.1" max="100" required
                        style="padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; width: 120px; font-size: 16px;">
+            </div>
+            <div>
+                <label style="display: block; font-size: 13px; color: #64748b; margin-bottom: 6px;">便宜服务阈值 (USD) <span style="color:#ef4444;">*</span></label>
+                <input type="number" name="cheap_threshold_usd" value="<?= $cheapThresholdUsd ?>"
+                       step="0.01" min="0" max="100" required
+                       style="padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; width: 120px; font-size: 16px;">
+                <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">用户充值后,API 成本 &lt; 此值的项目<br>会标灰 + 置底 (仍可点)</div>
             </div>
             <button type="submit" class="btn btn-primary">保存默认系数</button>
         </form>

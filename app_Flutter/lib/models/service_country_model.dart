@@ -21,6 +21,9 @@ class ServiceCountryModel {
   final String? countryFlag;
   final String? countryPhoneCode;
   final String? countryFlagEmoji;
+  /// 是否便宜: 用户已充值 且 API 成本 < 后端阈值时被标 true
+  /// 前端应标灰 + 置底, 但仍可点击
+  final bool isCheap;
 
   ServiceCountryModel({
     required this.id,
@@ -43,6 +46,7 @@ class ServiceCountryModel {
     this.countryFlag,
     this.countryPhoneCode,
     this.countryFlagEmoji,
+    this.isCheap = false,
   });
 
   factory ServiceCountryModel.fromJson(Map<String, dynamic> json) {
@@ -67,6 +71,7 @@ class ServiceCountryModel {
       countryFlag: json['flag'] ?? json['country_flag'],
       countryPhoneCode: json['phone_code'] ?? json['country_phone_code'],
       countryFlagEmoji: json['country_flag_emoji'],
+      isCheap: json['is_cheap'] == true || json['is_cheap'] == 1,
     );
   }
 

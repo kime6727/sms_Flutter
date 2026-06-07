@@ -108,53 +108,63 @@ if ($path === '/service-countries/published' && $method === 'GET') {
     // 获取系统默认系数
     $defaultBefore = floatval(getSetting($db, 'default_coefficient_before', '4'));
     $defaultAfter = floatval(getSetting($db, 'default_coefficient_after', '4.5'));
-    
+    // 便宜服务阈值 (USD): 用户充值后,API 成本 < 此值会被标 is_cheap=true (前端标灰+置底)
+    $cheapThresholdUsd = floatval(getSetting($db, 'cheap_threshold_usd', '0.05'));
+
     // 获取所有服务的自定义系数（一次性查询，避免N+1）
     $serviceCoefs = [];
     $coefsResult = $db->query("SELECT service_id, coefficient_before, coefficient_after FROM service_coefficients")->fetchAll();
     foreach ($coefsResult as $coef) {
         $serviceCoefs[$coef['service_id']] = $coef;
     }
-    
+
     // 判断用户是否充值过（决定使用 before 还是 after 系数）
+    // 注意: 只看 has_topup_history 字段, 该字段仅在 Apple IAP / 真实充值完成时设为 1
+    //       运营后台赠送积分、注册赠送、订单退款 都不会设置此字段
     $hasTopup = false;
     if ($userId) {
         $user = $db->query("SELECT has_topup_history FROM users WHERE id = ?", [$userId])->fetch();
         $hasTopup = $user && intval($user['has_topup_history']) === 1;
     }
-    
-    $serviceCountries = array_map(function($sc) use ($defaultBefore, $defaultAfter, $serviceCoefs, $hasTopup) {
+
+    $serviceCountries = array_map(function($sc) use ($defaultBefore, $defaultAfter, $serviceCoefs, $hasTopup, $cheapThresholdUsd) {
         if (!empty($sc['service_icon'])) {
             $sc['service_icon'] = getLocalImageUrl($sc['service_icon'], '/pic/fuwu/');
         }
         // country_flag / hero_country_id: hero_country_id 直接给客户端用 CDN 拼 URL
         // country_flag 字段为 null 时不返回空 URL
-        
+
         // 计算积分价格: price(美元) * 100(转为分) * 系数
         $basePriceCents = floatval($sc['price']) * 100;
+        $basePriceUsd = floatval($sc['price']);
         $serviceId = intval($sc['service_id']);
-        
+
         // 获取服务系数
         $serviceCoef = $serviceCoefs[$serviceId] ?? null;
-        $coefBefore = ($serviceCoef && $serviceCoef['coefficient_before'] !== null) 
-            ? floatval($serviceCoef['coefficient_before']) 
+        $coefBefore = ($serviceCoef && $serviceCoef['coefficient_before'] !== null)
+            ? floatval($serviceCoef['coefficient_before'])
             : $defaultBefore;
-        $coefAfter = ($serviceCoef && $serviceCoef['coefficient_after'] !== null) 
-            ? floatval($serviceCoef['coefficient_after']) 
+        $coefAfter = ($serviceCoef && $serviceCoef['coefficient_after'] !== null)
+            ? floatval($serviceCoef['coefficient_after'])
             : $defaultAfter;
-        
+
         // 根据用户是否充值过选择系数
         $coefficient = $hasTopup ? $coefAfter : $coefBefore;
-        
+
         // 计算积分价格并向上取整
         $pricePoints = intval(ceil($basePriceCents * $coefficient));
-        
+
+        // 便宜标记: 仅用户充值后 且 API 成本(美元) < 阈值 时为 true
+        //          前端根据此值将服务标灰 + 置底, 但仍可点击
+        $isCheap = $hasTopup && $basePriceUsd < $cheapThresholdUsd;
+
         $sc['price_points'] = $pricePoints;
         $sc['coefficient'] = $coefficient;
-        
+        $sc['is_cheap'] = $isCheap;
+
         return $sc;
     }, $serviceCountries);
-    
+
     echo json_encode(['success' => true, 'data' => $serviceCountries]);
     exit;
 }

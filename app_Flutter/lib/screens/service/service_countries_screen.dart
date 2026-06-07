@@ -32,8 +32,14 @@ class _ServiceCountriesScreenState extends State<ServiceCountriesScreen> {
   Widget build(BuildContext context) {
     final loc = context.loc;
     final serviceProvider = context.watch<ServiceProvider>();
-    final countries = serviceProvider.getCountriesForService(widget.serviceId)
-      ..sort((a, b) => a.price.compareTo(b.price));
+    // 排序: 正常项按价格升序, 便宜(isCheap)项排到末尾
+    final countries = [...serviceProvider.getCountriesForService(widget.serviceId)]
+      ..sort((a, b) {
+        // 便宜的始终排后面
+        if (a.isCheap != b.isCheap) return a.isCheap ? 1 : -1;
+        // 同状态内按价格升序
+        return a.price.compareTo(b.price);
+      });
 
     return Scaffold(
       appBar: AppBar(
@@ -92,6 +98,16 @@ class _CountryCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      // 便宜项: 卡片半透明 + 描边灰, 视觉上标记为不推荐
+      color: serviceCountry.isCheap
+          ? Theme.of(context).colorScheme.surfaceContainerLow
+          : null,
+      shape: serviceCountry.isCheap
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade300, width: 1),
+            )
+          : null,
       child: InkWell(
         onTap: authProvider.isAuthenticated
             ? () {
@@ -100,91 +116,119 @@ class _CountryCard extends StatelessWidget {
                 );
               }
             : null,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Flag
-              CmsImage(
-                kind: 'country',
-                heroId: serviceCountry.heroCountryId,
-                fallbackText: serviceCountry.countryFlagEmoji ?? (serviceCountry.countryCode ?? '?').toUpperCase(),
-                width: 48,
-                height: 48,
-                borderRadius: BorderRadius.circular(8),
-                fit: BoxFit.cover,
-              ),
-              const SizedBox(width: 12),
-              // Country name and phone number
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: Opacity(
+          // 便宜项: 整张卡片降低不透明度, 但仍可点击
+          opacity: serviceCountry.isCheap ? 0.55 : 1.0,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (serviceCountry.isCheap)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '成功率较低, 谨慎购买',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Row(
                   children: [
-                    Text(
-                      serviceCountry.countryDisplayName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                    // Flag
+                    CmsImage(
+                      kind: 'country',
+                      heroId: serviceCountry.heroCountryId,
+                      fallbackText: serviceCountry.countryFlagEmoji ?? (serviceCountry.countryCode ?? '?').toUpperCase(),
+                      width: 48,
+                      height: 48,
+                      borderRadius: BorderRadius.circular(8),
+                      fit: BoxFit.cover,
+                    ),
+                    const SizedBox(width: 12),
+                    // Country name and phone number
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            serviceCountry.countryDisplayName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            fakeNumber,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      fakeNumber,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                        fontFamily: 'monospace',
-                      ),
+                    // Price and buy button
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/icons/jifen.webp',
+                              width: 16,
+                              height: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$displayPrice',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: Color(0xFF6366F1),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: authProvider.isAuthenticated
+                              ? () {
+                                  context.push(
+                                    '/home/service/${serviceCountry.serviceId}/countries/purchase?country_id=${serviceCountry.countryId}&service_name=${Uri.encodeComponent(serviceCountry.serviceDisplayName)}&country_name=${Uri.encodeComponent(serviceCountry.countryDisplayName)}',
+                                  );
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                          child: Text(
+                            loc.translate('buy'),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              // Price and buy button
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/icons/jifen.webp',
-                        width: 16,
-                        height: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$displayPrice',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: Color(0xFF6366F1),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: authProvider.isAuthenticated
-                        ? () {
-                            context.push(
-                              '/home/service/${serviceCountry.serviceId}/countries/purchase?country_id=${serviceCountry.countryId}&service_name=${Uri.encodeComponent(serviceCountry.serviceDisplayName)}&country_name=${Uri.encodeComponent(serviceCountry.countryDisplayName)}',
-                            );
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                    ),
-                    child: Text(
-                      loc.translate('buy'),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
