@@ -283,6 +283,11 @@ $search = trim($_GET['q'] ?? '');
 $filter = $_GET['filter'] ?? 'all'; // all / published / unpublished / pinned / hot / recommended
 $tagFilter = intval($_GET['tag'] ?? -1);
 
+// 分页参数
+$page = max(1, intval($_GET['p'] ?? 1));
+$limit = max(10, min(200, intval($_GET['limit'] ?? 20)));  // 默认 20/页, 范围 10-200
+$offset = ($page - 1) * $limit;
+
 $where = ['1=1'];
 $params = [];
 if ($search !== '') {
@@ -298,24 +303,40 @@ if ($tagFilter >= 0) $where[] = 's.tag = ' . $tagFilter;
 $whereSql = implode(' AND ', $where);
 
 try {
+    // 统计总数 (给分页用)
+    $totalCount = intval($db->query("SELECT COUNT(*) FROM services s WHERE $whereSql", $params)->fetchColumn());
+
+    // 总页数 + 防越界（必须先 clamp page，再算 offset）
+    $totalPages = max(1, (int)ceil($totalCount / $limit));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $limit;
+
+    // 分页查数据
     $services = $db->query(
         "SELECT s.*,
                 (SELECT COUNT(*) FROM service_countries sc WHERE sc.service_id = s.id AND sc.is_published = 1) as published_countries,
                 (SELECT COUNT(*) FROM service_countries sc WHERE sc.service_id = s.id) as total_countries
          FROM services s WHERE $whereSql
-         ORDER BY s.is_pinned DESC, s.is_published DESC, s.tag DESC, s.sort_order ASC, s.id ASC"
+         ORDER BY s.is_pinned DESC, s.is_published DESC, s.tag DESC, s.sort_order ASC, s.id ASC
+         LIMIT $limit OFFSET $offset",
+        $params
     )->fetchAll();
     $queryError = null;
 } catch (Exception $e) {
     $services = [];
+    $totalCount = 0;
+    $totalPages = 1;
+    $page = 1;
+    $offset = 0;
     $queryError = $e->getMessage();
 }
 
-$total = count($services);
-$totalPublished = count(array_filter($services, fn($s) => $s['is_published']));
-$totalPinned = count(array_filter($services, fn($s) => $s['is_pinned']));
-$totalTagHot = count(array_filter($services, fn($s) => $s['tag'] == 1));
-$totalTagRec = count(array_filter($services, fn($s) => $s['tag'] == 2));
+// 统计(基于全表+过滤) - 全表计数更准确反映"已上架总数"
+$total = $totalCount;
+$totalPublished = intval($db->query("SELECT COUNT(*) FROM services s WHERE s.is_published = 1")->fetchColumn());
+$totalPinned = intval($db->query("SELECT COUNT(*) FROM services s WHERE s.is_pinned = 1")->fetchColumn());
+$totalTagHot = intval($db->query("SELECT COUNT(*) FROM services s WHERE s.tag = 1")->fetchColumn());
+$totalTagRec = intval($db->query("SELECT COUNT(*) FROM services s WHERE s.tag = 2")->fetchColumn());
 
 $msg = $_GET['msg'] ?? '';
 ?>
@@ -497,6 +518,56 @@ $msg = $_GET['msg'] ?? '';
             <?php endforeach; endif; ?>
         </tbody>
     </table>
+
+    <?php
+    // 分页 UI
+    $baseParams = ['page' => 'services'];
+    foreach (['q', 'filter', 'tag'] as $k) {
+        if (isset($_GET[$k]) && $_GET[$k] !== '' && !($k === 'tag' && $_GET[$k] === '-1') && !($k === 'filter' && $_GET[$k] === 'all')) {
+            $baseParams[$k] = $_GET[$k];
+        }
+    }
+    $pageUrl = function($p) use ($baseParams, $limit) {
+        $params = $baseParams;
+        $params['p'] = $p;
+        $params['limit'] = $limit;
+        return '?' . http_build_query($params);
+    };
+    // 页码范围: 当前页 ± 2
+    $pageStart = max(1, $page - 2);
+    $pageEnd = min($totalPages, $page + 2);
+    ?>
+    <div style="padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-top:1px solid #e2e8f0;">
+        <div style="font-size:13px;color:#64748b;">
+            共 <strong style="color:#0f172a;"><?= $totalCount ?></strong> 条
+            <span style="margin-left:8px;">第 <strong style="color:#0f172a;"><?= $page ?></strong> / <?= $totalPages ?> 页</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <label style="font-size:13px;color:#64748b;">每页</label>
+            <select onchange="location.href=this.value" style="padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
+                <?php foreach ([10, 20, 50, 100] as $opt): ?>
+                <option value="<?= $pageUrl(1) ?>&limit=<?= $opt ?>" <?= $limit == $opt ? 'selected' : '' ?>><?= $opt ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <?php if ($page > 1): ?>
+            <a href="<?= $pageUrl(1) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">« 首页</a>
+            <a href="<?= $pageUrl($page - 1) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">‹ 上一页</a>
+            <?php endif; ?>
+
+            <?php for ($p = $pageStart; $p <= $pageEnd; $p++): ?>
+            <a href="<?= $pageUrl($p) ?>" style="padding:4px 10px;border-radius:6px;text-decoration:none;font-size:13px;<?= $p == $page ? 'background:#6366f1;color:white;font-weight:600;' : 'background:#f8fafc;color:#475569;' ?>"><?= $p ?></a>
+            <?php endfor; ?>
+
+            <?php if ($page < $totalPages): ?>
+            <a href="<?= $pageUrl($page + 1) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">下一页 ›</a>
+            <a href="<?= $pageUrl($totalPages) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">末页 »</a>
+            <?php endif; ?>
+
+            <span style="font-size:12px;color:#94a3b8;margin-left:4px;">跳到</span>
+            <input type="number" min="1" max="<?= $totalPages ?>" value="<?= $page ?>" onchange="var v=parseInt(this.value||1,10);if(v>=1&&v<=<?= $totalPages ?>){var url=location.href;if(/[?&]p=/.test(url)){url=url.replace(/([?&])p=[^&]*/,'$1p='+v);}else{url+=(url.indexOf('?')>=0?'&':'?')+'p='+v;}location.href=url;}" style="width:50px;padding:4px 6px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;text-align:center;">
+        </div>
+    </div>
 </div>
 
 <div style="margin-top:20px;padding:16px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;">

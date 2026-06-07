@@ -163,10 +163,18 @@ if (($_POST['action'] ?? '') === 'update_name' && ($_POST['id'] ?? null)) {
     exit;
 }
 
-$countries = $db->query("SELECT * FROM countries ORDER BY id")->fetchAll();
+// 分页参数
+$page = max(1, intval($_GET['p'] ?? 1));
+$limit = max(10, min(200, intval($_GET['limit'] ?? 20)));  // 默认 20/页, 范围 10-200
 
-$totalCountries = count($countries);
-$activeCountries = count(array_filter($countries, fn($c) => $c['active']));
+$totalCountries = intval($db->query("SELECT COUNT(*) FROM countries")->fetchColumn());
+$totalPages = max(1, (int)ceil($totalCountries / $limit));
+$page = min($page, $totalPages);  // 防越界
+$offset = ($page - 1) * $limit;
+
+$countries = $db->query("SELECT * FROM countries ORDER BY id LIMIT $limit OFFSET $offset")->fetchAll();
+
+$activeCountries = intval($db->query("SELECT COUNT(*) FROM countries WHERE active = 1")->fetchColumn());
 $withServices = $db->query(
     "SELECT COUNT(DISTINCT country_id) as cnt FROM service_countries WHERE is_active = 1"
 )->fetch()['cnt'] ?? 0;
@@ -285,6 +293,44 @@ $withServices = $db->query(
             <?php endif; ?>
         </tbody>
     </table>
+
+    <?php
+    // 分页 UI（$page, $limit, $totalPages 已在前面 clamp 完毕）
+    $pageStart = max(1, $page - 2);
+    $pageEnd = min($totalPages, $page + 2);
+    $pageUrl = function($p) use ($limit) {
+        $params = ['page' => 'countries', 'p' => $p, 'limit' => $limit];
+        return '?' . http_build_query($params);
+    };
+    ?>
+    <div style="padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-top:1px solid #e2e8f0;">
+        <div style="font-size:13px;color:#64748b;">
+            共 <strong style="color:#0f172a;"><?= $totalCountries ?></strong> 个
+            <span style="margin-left:8px;">第 <strong style="color:#0f172a;"><?= $page ?></strong> / <?= $totalPages ?> 页</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <label style="font-size:13px;color:#64748b;">每页</label>
+            <select onchange="location.href=this.value" style="padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;">
+                <?php foreach ([10, 20, 50, 100] as $opt): ?>
+                <option value="<?= $pageUrl(1) ?>&limit=<?= $opt ?>" <?= $limit == $opt ? 'selected' : '' ?>><?= $opt ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <?php if ($page > 1): ?>
+            <a href="<?= $pageUrl(1) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">« 首页</a>
+            <a href="<?= $pageUrl($page - 1) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">‹ 上一页</a>
+            <?php endif; ?>
+
+            <?php for ($p = $pageStart; $p <= $pageEnd; $p++): ?>
+            <a href="<?= $pageUrl($p) ?>" style="padding:4px 10px;border-radius:6px;text-decoration:none;font-size:13px;<?= $p == $page ? 'background:#6366f1;color:white;font-weight:600;' : 'background:#f8fafc;color:#475569;' ?>"><?= $p ?></a>
+            <?php endfor; ?>
+
+            <?php if ($page < $totalPages): ?>
+            <a href="<?= $pageUrl($page + 1) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">下一页 ›</a>
+            <a href="<?= $pageUrl($totalPages) ?>" style="padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:6px;text-decoration:none;font-size:13px;">末页 »</a>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
 
 <div style="margin-top:20px;padding:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;">
